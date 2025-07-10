@@ -13,8 +13,8 @@ export const CreateUserSchema = z.object({
   password: z.string()
     .min(6, 'Password must be at least 6 characters')
     .max(255, 'Password must be less than 255 characters'),
-  role: z.enum(['Admin', 'Analyst', 'Viewer'], {
-    errorMap: () => ({ message: 'Role must be Admin, Analyst, or Viewer' })
+  role: z.enum(['admin', 'user'], {
+    errorMap: () => ({ message: 'Role must be admin or user' })
   })
 })
 
@@ -29,8 +29,8 @@ export const UpdateUserSchema = z.object({
     .max(255, 'Email must be less than 255 characters')
     .toLowerCase()
     .optional(),
-  role: z.enum(['Admin', 'Analyst', 'Viewer'], {
-    errorMap: () => ({ message: 'Role must be Admin, Analyst, or Viewer' })
+  role: z.enum(['admin', 'user'], {
+    errorMap: () => ({ message: 'Role must be admin or user' })
   }).optional(),
   is_active: z.boolean().optional()
 })

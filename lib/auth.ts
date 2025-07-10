@@ -64,20 +64,17 @@ export function validatePassword(password: string): { valid: boolean; message?: 
 }
 
 export function validateRole(role: string): boolean {
-  const allowedRoles = ['admin', 'user', 'Admin', 'Analyst', 'Viewer']
+  const allowedRoles = ['admin', 'user']
   return allowedRoles.includes(role)
 }
 
 // Normalize role for database storage
 export function normalizeRole(role: string): 'admin' | 'user' {
-  const roleMap: { [key: string]: 'admin' | 'user' } = {
-    'Admin': 'admin',
-    'admin': 'admin',
-    'Analyst': 'user',
-    'Viewer': 'user',
-    'user': 'user'
+  // With simplified role structure, just validate and return
+  if (role === 'admin' || role === 'user') {
+    return role
   }
-  return roleMap[role] || 'user'
+  return 'user' // Default to user for any invalid role
 }
 
 // Authorization helpers

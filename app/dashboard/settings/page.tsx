@@ -63,7 +63,7 @@ export default function SettingsPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "Viewer",
+    role: "user",
   })
 
   // Check if current user is admin
@@ -224,7 +224,7 @@ export default function SettingsPage() {
 
       if (response.success) {
         toast.success("User created successfully")
-        setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "Viewer" })
+        setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "user" })
         setShowAddUser(false)
         await loadUsers() // Reload users
       } else {
@@ -253,7 +253,7 @@ export default function SettingsPage() {
       email: user.email || "",
       password: "",
       confirmPassword: "",
-      role: user.role || "Viewer",
+      role: user.role || "user",
     })
   }
 
@@ -290,7 +290,7 @@ export default function SettingsPage() {
 
         toast.success("User updated successfully")
         setEditingUser(null)
-        setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "Viewer" })
+        setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "user" })
         await loadUsers() // Reload users
       } else {
         toast.error(response.message || "Failed to update user")
@@ -735,7 +735,7 @@ export default function SettingsPage() {
           onOpenChange={() => {
             setShowAddUser(false)
             setEditingUser(null)
-            setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "Viewer" })
+            setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "user" })
             setShowPassword(false)
             setShowConfirmPassword(false)
           }}
@@ -775,7 +775,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="userRole">Role</Label>
                 <Select 
-                  value={newUser.role || "Viewer"} 
+                  value={newUser.role || "user"} 
                   onValueChange={(value) => setNewUser({ ...newUser, role: value })}
                   disabled={!isAdmin && editingUser && currentUser?.id === editingUser.id}
                 >
@@ -783,9 +783,8 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Analyst">Analyst</SelectItem>
-                    <SelectItem value="Viewer">Viewer</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="user">User</SelectItem>
                   </SelectContent>
                 </Select>
                 {!isAdmin && editingUser && currentUser?.id === editingUser.id && (
@@ -854,7 +853,7 @@ export default function SettingsPage() {
                 onClick={() => {
                   setShowAddUser(false)
                   setEditingUser(null)
-                  setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "Viewer" })
+                  setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "user" })
                 }}
               >
                 Cancel
