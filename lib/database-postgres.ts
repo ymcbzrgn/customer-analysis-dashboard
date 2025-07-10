@@ -134,14 +134,15 @@ class PostgreSQLDatabase {
     const hashedPassword = await hashPassword(userData.password)
 
     const result = await this.query(`
-      INSERT INTO users (email, password_hash, name, role, is_active)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, email, name, role, is_active, created_at, updated_at
+      INSERT INTO users (email, password_hash, name, role, permissions, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, email, name, role, permissions, is_active, created_at, updated_at
     `, [
       userData.email,
       hashedPassword,
       userData.name,
       userData.role || 'user',
+      [],
       true
     ])
 
