@@ -61,3 +61,10 @@ Thumbs.db
 # Docker volumes
 postgres_data/
 pgadmin_data/
+
+CLAUDE.md
+GEMINI.md
+SCHEMA_ANALYSIS.md
+
+.claude/
+.gemini/

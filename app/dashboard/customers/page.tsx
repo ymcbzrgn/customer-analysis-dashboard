@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,83 +55,10 @@ interface Customer {
   description?: string
 }
 
-const mockCustomers: Customer[] = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@techcorp.com",
-    countryCode: "US",
-    industry: "Technology",
-    score: 89,
-    socialMedia: {
-      linkedin: "https://linkedin.com/in/sarahjohnson",
-      twitter: "https://twitter.com/sarahj",
-      facebook: "https://facebook.com/sarah.johnson",
-    },
-    website: "https://techcorp.com",
-    createdDate: "2024-01-15",
-    status: "pending",
-    notes: "High potential lead from tech conference",
-    description:
-      "Senior Software Engineer with 8+ years of experience in full-stack development. Specializes in React, Node.js, and cloud technologies. Active in tech communities and open source projects.",
-  },
-  {
-    id: "2",
-    name: "Michael Chen",
-    email: "m.chen@financeplus.com",
-    countryCode: "CA",
-    industry: "Finance",
-    score: 92,
-    socialMedia: {
-      linkedin: "https://linkedin.com/in/michaelchen",
-      twitter: "https://twitter.com/mchen_finance",
-    },
-    website: "https://financeplus.com",
-    createdDate: "2024-01-14",
-    status: "approved",
-    notes: "Excellent financial background",
-    description:
-      "Financial Analyst with expertise in investment strategies and risk management. CFA certified with strong analytical skills and proven track record in portfolio management.",
-  },
-  {
-    id: "3",
-    name: "Emma Rodriguez",
-    email: "emma.r@healthsolutions.com",
-    countryCode: "MX",
-    industry: "Healthcare",
-    score: 76,
-    socialMedia: {
-      linkedin: "https://linkedin.com/in/emmarodriguez",
-      instagram: "https://instagram.com/emma_health",
-    },
-    website: "https://healthsolutions.com",
-    createdDate: "2024-01-13",
-    status: "pending",
-    notes: "Healthcare industry expertise",
-    description:
-      "Healthcare Technology Specialist focused on digital health solutions and patient care optimization. Experience in telemedicine platforms and healthcare data analytics.",
-  },
-  {
-    id: "4",
-    name: "Alex Thompson",
-    email: "alex@retailworld.com",
-    countryCode: "UK",
-    industry: "Retail",
-    score: 34,
-    socialMedia: {
-      facebook: "https://facebook.com/alex.thompson.retail",
-    },
-    website: "https://retailworld.com",
-    createdDate: "2024-01-12",
-    status: "rejected",
-    notes: "Low engagement score",
-    description:
-      "Retail Operations Manager with focus on supply chain optimization and customer experience. Working on digital transformation initiatives in traditional retail.",
-  },
-]
-
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [industryFilter, setIndustryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -139,6 +66,55 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [comment, setComment] = useState("")
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<Customer | null>(null)
+  const [detailModalComment, setDetailModalComment] = useState("")
+  const [isEditingComment, setIsEditingComment] = useState(false)
+
+  // Load customers from API on component mount
+  useEffect(() => {
+    loadCustomers()
+  }, [])
+
+  const loadCustomers = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Using admin user ID for now - in production this should come from auth context
+      const response = await fetch('/api/customers?userId=1')
+      const data = await response.json()
+      
+      if (data.success) {
+        // Transform PostgreSQL data to match UI interface
+        const transformedCustomers = data.customers.map((customer: any) => ({
+          id: customer.id.toString(),
+          name: customer.name,
+          email: customer.contact_email || 'No email provided',
+          countryCode: customer.country_code || 'N/A',
+          industry: customer.industry || 'Unknown',
+          score: customer.compatibility_score || 0,
+          socialMedia: {
+            linkedin: customer.linkedin,
+            twitter: customer.twitter,
+            facebook: customer.facebook,
+            instagram: customer.instagram,
+          },
+          website: customer.website,
+          createdDate: customer.created_at || customer.updated_at || new Date().toISOString(),
+          status: customer.status || "pending" as const,
+          notes: customer.notes || '',
+          description: customer.description || '',
+        }))
+        setCustomers(transformedCustomers)
+      } else {
+        setError(data.message || 'Failed to load customers')
+      }
+    } catch (err) {
+      console.error('Error loading customers:', err)
+      setError('Failed to load customers')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredCustomers = customers.filter((customer) => {
     const matchesSearch =
@@ -155,18 +131,112 @@ export default function CustomersPage() {
     return matchesSearch && matchesIndustry && matchesStatus && matchesScore
   })
 
-  const handleStatusChange = (customerId: string, newStatus: "approved" | "rejected") => {
-    setCustomers((prev) =>
-      prev.map((customer) => (customer.id === customerId ? { ...customer, status: newStatus } : customer)),
-    )
+  const handleStatusChange = async (customerId: string, newStatus: "approved" | "rejected") => {
+    try {
+      const response = await fetch(`/api/customers/${customerId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          status: newStatus,
+          comment: `Status changed to ${newStatus} by user`
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Update local state
+        setCustomers((prev) =>
+          prev.map((customer) => (customer.id === customerId ? { ...customer, status: newStatus } : customer)),
+        )
+      } else {
+        console.error('Failed to update customer status:', data.message)
+        setError(data.message || 'Failed to update customer status')
+      }
+    } catch (err) {
+      console.error('Error updating customer status:', err)
+      setError('Failed to update customer status')
+    }
   }
 
-  const handleAddComment = (customerId: string, newComment: string) => {
-    setCustomers((prev) =>
-      prev.map((customer) => (customer.id === customerId ? { ...customer, notes: newComment } : customer)),
-    )
-    setComment("")
-    setSelectedCustomer(null)
+  const handleAddComment = async (customerId: string, newComment: string) => {
+    try {
+      // Get current customer to preserve status
+      const currentCustomer = customers.find(c => c.id === customerId)
+      const currentStatus = currentCustomer?.status || 'pending'
+      
+      const response = await fetch(`/api/customers/${customerId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          status: currentStatus,
+          comment: newComment
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Update local state
+        setCustomers((prev) =>
+          prev.map((customer) => (customer.id === customerId ? { ...customer, notes: newComment } : customer)),
+        )
+        setComment("")
+        setSelectedCustomer(null)
+      } else {
+        console.error('Failed to update customer notes:', data.message)
+        setError(data.message || 'Failed to update customer notes')
+      }
+    } catch (err) {
+      console.error('Error updating customer notes:', err)
+      setError('Failed to update customer notes')
+    }
+  }
+
+  const handleDetailModalCommentUpdate = async (customerId: string, newComment: string) => {
+    try {
+      // Get current customer to preserve status
+      const currentCustomer = customers.find(c => c.id === customerId)
+      const currentStatus = currentCustomer?.status || 'pending'
+      
+      const response = await fetch(`/api/customers/${customerId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          status: currentStatus,
+          comment: newComment
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Update local state
+        setCustomers((prev) =>
+          prev.map((customer) => (customer.id === customerId ? { ...customer, notes: newComment } : customer)),
+        )
+        
+        // Update the detail modal state
+        if (selectedCustomerDetail && selectedCustomerDetail.id === customerId) {
+          setSelectedCustomerDetail({ ...selectedCustomerDetail, notes: newComment })
+        }
+        
+        setIsEditingComment(false)
+        setDetailModalComment("")
+      } else {
+        console.error('Failed to update customer notes:', data.message)
+        setError(data.message || 'Failed to update customer notes')
+      }
+    } catch (err) {
+      console.error('Error updating customer notes:', err)
+      setError('Failed to update customer notes')
+    }
   }
 
   const getScoreColor = (score: number) => {
@@ -290,7 +360,12 @@ export default function CustomersPage() {
                 <SelectItem value="low">Low (0-49)</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="w-full bg-transparent">
+            <Button variant="outline" className="w-full bg-transparent" onClick={() => {
+              setSearchTerm("")
+              setIndustryFilter("all")
+              setStatusFilter("all")
+              setScoreRange("all")
+            }}>
               <Filter className="mr-2 h-4 w-4" />
               Reset Filters
             </Button>
@@ -319,134 +394,164 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-8 w-8 cursor-pointer" onClick={() => setSelectedCustomerDetail(customer)}>
-                          <AvatarImage src={`/placeholder.svg?height=32&width=32`} />
-                          <AvatarFallback className="bg-blue-100 text-blue-600">
-                            {customer.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="cursor-pointer" onClick={() => setSelectedCustomerDetail(customer)}>
-                          <div className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
-                            {customer.name}
-                          </div>
-                          <div className="text-sm text-gray-500">{customer.email}</div>
-                          <div className="flex items-center space-x-3 mt-2">
-                            {renderSocialMediaIcons(customer.socialMedia)}
-                            {customer.website && (
-                              <a
-                                href={customer.website}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-600 hover:text-gray-800 transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Globe className="h-4 w-4" />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Building className="h-4 w-4 text-gray-400 mr-2" />
-                        {customer.industry}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-                        {customer.countryCode}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getScoreColor(customer.score)}>{customer.score}/100</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(customer.status)}>
-                        {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        {new Date(customer.createdDate).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-green-600 border-green-200 hover:bg-green-50 bg-transparent"
-                          onClick={() => handleStatusChange(customer.id, "approved")}
-                          disabled={customer.status === "approved"}
-                        >
-                          <Check className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
-                          onClick={() => handleStatusChange(customer.id, "rejected")}
-                          disabled={customer.status === "rejected"}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-blue-600 border-blue-200 hover:bg-blue-50 bg-transparent"
-                              onClick={() => {
-                                setSelectedCustomer(customer)
-                                setComment(customer.notes)
-                              }}
-                            >
-                              <MessageSquare className="h-3 w-3" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Add Comment</DialogTitle>
-                              <DialogDescription>Add or update notes for {customer.name}</DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <Textarea
-                                placeholder="Enter your comments..."
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                rows={4}
-                              />
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                onClick={() => selectedCustomer && handleAddComment(selectedCustomer.id, comment)}
-                              >
-                                Save Comment
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span className="ml-2">Loading customers...</span>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="text-red-600">{error}</div>
+                      <Button onClick={loadCustomers} className="mt-2">
+                        Try Again
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredCustomers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="text-gray-500">No customers found</div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-8 w-8 cursor-pointer" onClick={() => setSelectedCustomerDetail(customer)}>
+                            <AvatarImage src={`/placeholder.svg?height=32&width=32`} />
+                            <AvatarFallback className="bg-blue-100 text-blue-600">
+                              {customer.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="cursor-pointer" onClick={() => setSelectedCustomerDetail(customer)}>
+                            <div className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                              {customer.name}
+                            </div>
+                            <div className="text-sm text-gray-500">{customer.email}</div>
+                            <div className="flex items-center space-x-3 mt-2">
+                              {renderSocialMediaIcons(customer.socialMedia)}
+                              {customer.website && (
+                                <a
+                                  href={customer.website}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-gray-600 hover:text-gray-800 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Globe className="h-4 w-4" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <Building className="h-4 w-4 text-gray-400 mr-2" />
+                          {customer.industry}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                          {customer.countryCode}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getScoreColor(customer.score)}>{customer.score}/100</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(customer.status)}>
+                          {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center text-sm text-gray-500">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          {new Date(customer.createdDate).toLocaleDateString()}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-200 hover:bg-green-50 bg-transparent"
+                            onClick={() => handleStatusChange(customer.id, "approved")}
+                            disabled={customer.status === "approved"}
+                          >
+                            <Check className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
+                            onClick={() => handleStatusChange(customer.id, "rejected")}
+                            disabled={customer.status === "rejected"}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-blue-600 border-blue-200 hover:bg-blue-50 bg-transparent"
+                                onClick={() => {
+                                  setSelectedCustomer(customer)
+                                  setComment(customer.notes)
+                                }}
+                              >
+                                <MessageSquare className="h-3 w-3" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Add Comment</DialogTitle>
+                                <DialogDescription>Add or update notes for {customer.name}</DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <Textarea
+                                  placeholder="Enter your comments..."
+                                  value={comment}
+                                  onChange={(e) => setComment(e.target.value)}
+                                  rows={4}
+                                />
+                              </div>
+                              <DialogFooter>
+                                <Button
+                                  onClick={() => selectedCustomer && handleAddComment(selectedCustomer.id, comment)}
+                                >
+                                  Save Comment
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
       {/* Customer Detail Dialog */}
-      <Dialog open={!!selectedCustomerDetail} onOpenChange={() => setSelectedCustomerDetail(null)}>
+      <Dialog open={!!selectedCustomerDetail} onOpenChange={() => {
+        setSelectedCustomerDetail(null)
+        setIsEditingComment(false)
+        setDetailModalComment("")
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-3">
@@ -573,14 +678,66 @@ export default function CustomersPage() {
               </div>
 
               {/* Notes */}
-              {selectedCustomerDetail.notes && (
-                <div>
+              <div>
+                <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                  {!isEditingComment && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsEditingComment(true)
+                        setDetailModalComment(selectedCustomerDetail?.notes || '')
+                      }}
+                    >
+                      <MessageSquare className="h-3 w-3 mr-1" />
+                      {selectedCustomerDetail.notes ? 'Edit' : 'Add'} Note
+                    </Button>
+                  )}
+                </div>
+                
+                {isEditingComment ? (
+                  <div className="mt-2 space-y-3">
+                    <Textarea
+                      placeholder="Enter your notes..."
+                      value={detailModalComment || ""}
+                      onChange={(e) => setDetailModalComment(e.target.value)}
+                      rows={4}
+                      className="w-full"
+                    />
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (selectedCustomerDetail) {
+                            handleDetailModalCommentUpdate(selectedCustomerDetail.id, detailModalComment)
+                          }
+                        }}
+                      >
+                        Save Note
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsEditingComment(false)
+                          setDetailModalComment("")
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : selectedCustomerDetail.notes ? (
                   <div className="mt-2 p-3 bg-gray-50 rounded-lg">
                     <p className="text-sm text-gray-700">{selectedCustomerDetail.notes}</p>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 italic">No notes added yet</p>
+                  </div>
+                )}
+              </div>
 
               {/* Created Date */}
               <div>
@@ -601,6 +758,8 @@ export default function CustomersPage() {
                 if (selectedCustomerDetail) {
                   handleStatusChange(selectedCustomerDetail.id, "approved")
                   setSelectedCustomerDetail(null)
+                  setIsEditingComment(false)
+                  setDetailModalComment("")
                 }
               }}
             >
@@ -614,23 +773,13 @@ export default function CustomersPage() {
                 if (selectedCustomerDetail) {
                   handleStatusChange(selectedCustomerDetail.id, "rejected")
                   setSelectedCustomerDetail(null)
+                  setIsEditingComment(false)
+                  setDetailModalComment("")
                 }
               }}
             >
               <X className="h-4 w-4 mr-2" />
               Reject
-            </Button>
-            <Button
-              onClick={() => {
-                if (selectedCustomerDetail) {
-                  setSelectedCustomer(selectedCustomerDetail)
-                  setComment(selectedCustomerDetail.notes)
-                  setSelectedCustomerDetail(null)
-                }
-              }}
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Add Comment
             </Button>
           </DialogFooter>
         </DialogContent>

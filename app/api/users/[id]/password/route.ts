@@ -5,7 +5,7 @@ import { validateChangePassword } from '@/lib/validation'
 import { verifyPassword } from '@/lib/auth'
 
 interface RouteParams {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 // PUT /api/users/[id]/password - Change user password
@@ -17,7 +17,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const user = authResult.user!
-    const targetUserId = params.id
+    const { id: targetUserId } = await params
 
     // Users can only change their own password unless they're admin
     if (user.role !== 'admin' && user.userId !== targetUserId) {

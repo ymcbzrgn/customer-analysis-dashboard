@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(find:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(node:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(npm run:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

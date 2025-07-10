@@ -4,10 +4,10 @@ import { dbServer } from '@/lib/database-server'
 // GET /api/users/[id]/permissions - Get user permissions
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json(
@@ -43,11 +43,11 @@ export async function GET(
 // PUT /api/users/[id]/permissions - Update user permissions
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { permissions, role } = await request.json()
-    const { id } = params
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json(

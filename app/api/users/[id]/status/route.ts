@@ -4,11 +4,11 @@ import { dbServer } from '@/lib/database-server'
 // PUT /api/users/[id]/status - Update user status (activate/deactivate)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { isActive } = await request.json()
-    const { id } = params
+    const { id } = await params
 
     if (!id) {
       return NextResponse.json(

@@ -5,7 +5,7 @@ import { validateUpdateUser } from '@/lib/validation'
 import { normalizeRole } from '@/lib/auth'
 
 interface RouteParams {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 // GET /api/users/[id] - Get specific user (Admin or self)
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const user = authResult.user!
-    const targetUserId = params.id
+    const { id: targetUserId } = await params
 
     // Users can only view their own profile unless they're admin
     if (user.role !== 'admin' && user.userId !== targetUserId) {
@@ -53,7 +53,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     const user = authResult.user!
-    const targetUserId = params.id
+    const { id: targetUserId } = await params
 
     // Users can only edit their own profile unless they're admin
     if (user.role !== 'admin' && user.userId !== targetUserId) {
@@ -135,7 +135,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const user = authResult.user!
-    const targetUserId = params.id
+    const { id: targetUserId } = await params
 
     // Prevent self-deletion
     if (user.userId === targetUserId) {

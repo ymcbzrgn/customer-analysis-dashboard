@@ -20,23 +20,14 @@ export interface User {
 export interface Customer {
   id: string
   name: string
-  email: string
-  country_code: string
-  industry: string
-  score: number
-  social_media: {
-    linkedin?: string
-    twitter?: string
-    facebook?: string
-    instagram?: string
-  }
   website?: string
-  status: "pending" | "approved" | "rejected"
-  notes?: string
-  description?: string
-  user_id: string
-  created_at: Date
-  updated_at: Date
+  contact_email?: string
+  facebook?: string
+  twitter?: string
+  linkedin?: string
+  instagram?: string
+  created_at?: Date
+  updated_at?: Date
 }
 
 export interface UserPreferences {
@@ -229,32 +220,87 @@ class PostgreSQLDatabase {
     }
   }
 
-  // Customer operations
-  async getCustomers(): Promise<Customer[]> {
+  // Customer operations - uses real classification data when available
+  // NOTE: customer_classifications table is currently empty, so compatibility_score will be NULL
+  // Industry classification uses smart name-based detection as fallback
+  async getCustomers(): Promise<any[]> {
     const result = await this.query(`
-      SELECT id, name, email, country_code, industry, score, social_media, 
-             website, status, notes, description, user_id, created_at, updated_at
-      FROM customers
-      ORDER BY created_at DESC
+      SELECT 
+        c.id,
+        c.name,
+        c.website,
+        c.contact_email,
+        c.facebook,
+        c.twitter,
+        c.linkedin,
+        c.instagram,
+        c.created_at,
+        c.updated_at,
+        COALESCE(cs.status, 'pending') as status,
+        COALESCE(cs.comment, '') as notes,
+        cs.updated_at as status_updated_at,
+        -- Use real compatibility score from customer_classifications table
+        cc.compatibility_score,
+        -- Smart industry classification based on company name
+        CASE 
+          WHEN c.name ILIKE '%tech%' OR c.name ILIKE '%data%' OR c.name ILIKE '%analytics%' OR c.name ILIKE '%software%' THEN 'Technology'
+          WHEN c.name ILIKE '%finance%' OR c.name ILIKE '%bank%' OR c.name ILIKE '%investment%' OR c.name ILIKE '%capital%' THEN 'Finance'
+          WHEN c.name ILIKE '%health%' OR c.name ILIKE '%medical%' OR c.name ILIKE '%care%' OR c.name ILIKE '%pharma%' THEN 'Healthcare'
+          WHEN c.name ILIKE '%retail%' OR c.name ILIKE '%shop%' OR c.name ILIKE '%store%' OR c.name ILIKE '%commerce%' THEN 'Retail'
+          WHEN c.name ILIKE '%consulting%' OR c.name ILIKE '%services%' OR c.name ILIKE '%solutions%' THEN 'Consulting'
+          ELSE 'Technology'
+        END as industry,
+        -- Real country code from dorks table, fallback to 'US'
+        COALESCE(d.country_code, 'US') as country_code,
+        '' as description
+      FROM customers c
+      LEFT JOIN customer_status cs ON c.id = cs.customer_id
+      LEFT JOIN customer_classifications cc ON c.id = cc.customer_id
+      LEFT JOIN dorks d ON cc.dork_id = d.id
+      ORDER BY COALESCE(c.created_at, c.updated_at, CURRENT_TIMESTAMP) DESC
     `)
     return result.rows
   }
 
-  async getCustomersByUser(userId: string): Promise<Customer[]> {
-    const result = await this.query(`
-      SELECT id, name, email, country_code, industry, score, social_media, 
-             website, status, notes, description, user_id, created_at, updated_at
-      FROM customers
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-    `, [userId])
-    return result.rows
+  async getCustomersByUser(userId: string): Promise<any[]> {
+    // Since there's no user_id in customers table, return all customers for now
+    // In production, you might want to add proper user association
+    return this.getCustomers()
+  }
+
+  // Add method to update customer status (for approve/reject)
+  async updateCustomerStatus(customerId: string, status: string, comment?: string): Promise<boolean> {
+    try {
+      // First check if status exists for this customer
+      const existing = await this.query(`
+        SELECT id FROM customer_status WHERE customer_id = $1
+      `, [customerId])
+      
+      if (existing.rows.length > 0) {
+        // Update existing status
+        const result = await this.query(`
+          UPDATE customer_status 
+          SET status = $1, comment = $2, updated_at = CURRENT_TIMESTAMP
+          WHERE customer_id = $3
+        `, [status, comment || '', customerId])
+        return result.rowCount > 0
+      } else {
+        // Insert new status
+        const result = await this.query(`
+          INSERT INTO customer_status (customer_id, status, comment, updated_at)
+          VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+        `, [customerId, status, comment || ''])
+        return result.rowCount > 0
+      }
+    } catch (error) {
+      console.error('Failed to update customer status:', error)
+      return false
+    }
   }
 
   async getCustomerById(id: string): Promise<Customer | null> {
     const result = await this.query(`
-      SELECT id, name, email, country_code, industry, score, social_media, 
-             website, status, notes, description, user_id, created_at, updated_at
+      SELECT id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at
       FROM customers
       WHERE id = $1
     `, [id])
@@ -263,23 +309,17 @@ class PostgreSQLDatabase {
 
   async createCustomer(customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<Customer> {
     const result = await this.query(`
-      INSERT INTO customers (name, email, country_code, industry, score, social_media, 
-                           website, status, notes, description, user_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING id, name, email, country_code, industry, score, social_media, 
-                website, status, notes, description, user_id, created_at, updated_at
+      INSERT INTO customers (name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at
     `, [
       customerData.name,
-      customerData.email,
-      customerData.country_code,
-      customerData.industry,
-      customerData.score,
-      JSON.stringify(customerData.social_media),
       customerData.website,
-      customerData.status,
-      customerData.notes,
-      customerData.description,
-      customerData.user_id
+      customerData.contact_email,
+      customerData.facebook,
+      customerData.twitter,
+      customerData.linkedin,
+      customerData.instagram
     ])
 
     return result.rows[0]
@@ -290,15 +330,13 @@ class PostgreSQLDatabase {
     const values = []
     let paramIndex = 1
 
+    // Only allow updates to fields that exist in the real schema
+    const allowedFields = ['name', 'website', 'contact_email', 'facebook', 'twitter', 'linkedin', 'instagram']
+    
     Object.entries(updates).forEach(([key, value]) => {
-      if (key !== 'id' && key !== 'created_at' && value !== undefined) {
-        if (key === 'social_media') {
-          fields.push(`${key} = $${paramIndex}`)
-          values.push(JSON.stringify(value))
-        } else {
-          fields.push(`${key} = $${paramIndex}`)
-          values.push(value)
-        }
+      if (allowedFields.includes(key) && value !== undefined) {
+        fields.push(`${key} = $${paramIndex}`)
+        values.push(value)
         paramIndex++
       }
     })
@@ -310,8 +348,7 @@ class PostgreSQLDatabase {
       UPDATE customers 
       SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
       WHERE id = $${paramIndex}
-      RETURNING id, name, email, country_code, industry, score, social_media, 
-                website, status, notes, description, user_id, created_at, updated_at
+      RETURNING id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at
     `, values)
 
     return result.rows[0] || null

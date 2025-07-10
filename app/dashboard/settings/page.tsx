@@ -57,6 +57,7 @@ export default function SettingsPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
@@ -210,6 +211,8 @@ export default function SettingsPage() {
 
     try {
       setActionLoading(true)
+      console.log('Creating user with email:', newUser.email)
+      
       const response = await userApi.createUser({
         name: newUser.name,
         email: newUser.email,
@@ -217,16 +220,20 @@ export default function SettingsPage() {
         role: newUser.role,
       })
 
+      console.log('Create user response:', response)
+
       if (response.success) {
         toast.success("User created successfully")
         setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "Viewer" })
         setShowAddUser(false)
         await loadUsers() // Reload users
       } else {
+        console.error('Failed to create user:', response.message)
         toast.error(response.message || "Failed to create user")
       }
     } catch (error) {
-      toast.error("Failed to create user")
+      console.error('Create user error:', error)
+      toast.error("Failed to create user: " + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setActionLoading(false)
     }
@@ -239,13 +246,14 @@ export default function SettingsPage() {
       return
     }
 
+    setShowAddUser(false) // Ensure add user dialog is closed
     setEditingUser(user)
     setNewUser({
-      name: user.name,
-      email: user.email,
+      name: user.name || "",
+      email: user.email || "",
       password: "",
       confirmPassword: "",
-      role: user.role,
+      role: user.role || "Viewer",
     })
   }
 
@@ -294,31 +302,42 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = (user: User) => {
     if (!isAdmin) {
       toast.error("Only administrators can delete users")
       return
     }
 
-    if (currentUser?.id === userId) {
+    if (currentUser?.id === user.id) {
       toast.error("You cannot delete your own account")
       return
     }
 
-    if (!confirm("Are you sure you want to delete this user?")) return
+    setUserToDelete(user)
+  }
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return
 
     try {
       setActionLoading(true)
-      const response = await userApi.deleteUser(userId)
+      console.log('Deleting user:', userToDelete.email, 'ID:', userToDelete.id)
+      
+      const response = await userApi.deleteUser(userToDelete.id)
+      console.log('Delete user response:', response)
 
       if (response.success) {
         toast.success("User deleted successfully")
+        setUserToDelete(null)
         await loadUsers() // Reload users
+        console.log('User deleted and list reloaded')
       } else {
+        console.error('Failed to delete user:', response.message)
         toast.error(response.message || "Failed to delete user")
       }
     } catch (error) {
-      toast.error("Failed to delete user")
+      console.error('Delete user error:', error)
+      toast.error("Failed to delete user: " + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setActionLoading(false)
     }
@@ -362,7 +381,7 @@ export default function SettingsPage() {
                   <Label htmlFor="name">Full Name</Label>
                   <Input
                     id="name"
-                    value={profile.name}
+                    value={profile.name || ""}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                   />
                 </div>
@@ -371,7 +390,7 @@ export default function SettingsPage() {
                   <Input
                     id="email"
                     type="email"
-                    value={profile.email}
+                    value={profile.email || ""}
                     onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                   />
                 </div>
@@ -379,7 +398,7 @@ export default function SettingsPage() {
                   <Label htmlFor="company">Company</Label>
                   <Input
                     id="company"
-                    value={profile.company}
+                    value={profile.company || ""}
                     onChange={(e) => setProfile({ ...profile, company: e.target.value })}
                   />
                 </div>
@@ -387,7 +406,7 @@ export default function SettingsPage() {
                   <Label htmlFor="role">Role</Label>
                   <Input
                     id="role"
-                    value={profile.role}
+                    value={profile.role || ""}
                     onChange={(e) => setProfile({ ...profile, role: e.target.value })}
                   />
                 </div>
@@ -398,7 +417,7 @@ export default function SettingsPage() {
                 <Textarea
                   id="bio"
                   placeholder="Tell us about yourself..."
-                  value={profile.bio}
+                  value={profile.bio || ""}
                   onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
                   rows={3}
                 />
@@ -508,7 +527,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="timezone">Timezone</Label>
                 <Select
-                  value={preferences.timezone}
+                  value={preferences.timezone || "UTC-5"}
                   onValueChange={(value) => setPreferences({ ...preferences, timezone: value })}
                 >
                   <SelectTrigger>
@@ -527,7 +546,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="language">Language</Label>
                 <Select
-                  value={preferences.language}
+                  value={preferences.language || "en"}
                   onValueChange={(value) => setPreferences({ ...preferences, language: value })}
                 >
                   <SelectTrigger>
@@ -545,7 +564,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="theme">Theme</Label>
                 <Select
-                  value={preferences.theme}
+                  value={preferences.theme || "light"}
                   onValueChange={(value) => setPreferences({ ...preferences, theme: value })}
                 >
                   <SelectTrigger>
@@ -691,7 +710,7 @@ export default function SettingsPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleDeleteUser(user.id)}
+                                  onClick={() => handleDeleteUser(user)}
                                   disabled={actionLoading}
                                   className="text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
                                 >
@@ -717,6 +736,8 @@ export default function SettingsPage() {
             setShowAddUser(false)
             setEditingUser(null)
             setNewUser({ name: "", email: "", password: "", confirmPassword: "", role: "Viewer" })
+            setShowPassword(false)
+            setShowConfirmPassword(false)
           }}
         >
           <DialogContent className="max-w-md">
@@ -734,7 +755,7 @@ export default function SettingsPage() {
                 <Label htmlFor="userName">Full Name</Label>
                 <Input
                   id="userName"
-                  value={newUser.name}
+                  value={newUser.name || ""}
                   onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                   placeholder="Enter full name"
                 />
@@ -745,7 +766,7 @@ export default function SettingsPage() {
                 <Input
                   id="userEmail"
                   type="email"
-                  value={newUser.email}
+                  value={newUser.email || ""}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   placeholder="Enter email address"
                 />
@@ -754,7 +775,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="userRole">Role</Label>
                 <Select 
-                  value={newUser.role} 
+                  value={newUser.role || "Viewer"} 
                   onValueChange={(value) => setNewUser({ ...newUser, role: value })}
                   disabled={!isAdmin && editingUser && currentUser?.id === editingUser.id}
                 >
@@ -780,7 +801,7 @@ export default function SettingsPage() {
                   <Input
                     id="userPassword"
                     type={showPassword ? "text" : "password"}
-                    value={newUser.password}
+                    value={newUser.password || ""}
                     onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                     placeholder={editingUser ? "Enter new password" : "Enter password"}
                   />
@@ -806,7 +827,7 @@ export default function SettingsPage() {
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
-                    value={newUser.confirmPassword}
+                    value={newUser.confirmPassword || ""}
                     onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
                     placeholder="Confirm password"
                   />
@@ -850,6 +871,61 @@ export default function SettingsPage() {
                   </>
                 ) : (
                   editingUser ? "Update User" : "Add User"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete User Confirmation Modal */}
+        <Dialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete User</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete <strong>{userToDelete?.name}</strong>? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">
+                      This will permanently delete:
+                    </h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>User account: {userToDelete?.email}</li>
+                        <li>All associated permissions</li>
+                        <li>Access to the system</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setUserToDelete(null)}
+                disabled={actionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteUser}
+                disabled={actionLoading}
+              >
+                {actionLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete User"
                 )}
               </Button>
             </DialogFooter>
