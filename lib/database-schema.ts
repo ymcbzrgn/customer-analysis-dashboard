@@ -203,14 +203,30 @@ class DatabaseSchemaManager {
       ORDER BY tc.constraint_type, tc.constraint_name
     `, [tableName])
 
-    const constraints: ConstraintDefinition[] = constraintsResult.rows.map(row => ({
-      constraint_name: row.constraint_name,
-      constraint_type: row.constraint_type,
-      column_names: Array.isArray(row.column_names) ? row.column_names.filter(Boolean) : [row.column_names].filter(Boolean),
-      foreign_table: row.foreign_table,
-      foreign_columns: Array.isArray(row.foreign_columns) ? row.foreign_columns?.filter(Boolean) : row.foreign_columns ? [row.foreign_columns].filter(Boolean) : undefined,
-      check_clause: row.check_clause
-    }))
+    const constraints: ConstraintDefinition[] = constraintsResult.rows.map(row => {
+      // Clean up column names from PostgreSQL array format
+      const cleanColumnNames = (names: any) => {
+        if (!names) return []
+        if (Array.isArray(names)) {
+          return names.filter(Boolean).map(name => 
+            typeof name === 'string' ? name.replace(/[{}]/g, '') : name
+          ).filter(name => name && name !== 'NULL')
+        }
+        if (typeof names === 'string') {
+          return names.replace(/[{}]/g, '').split(',').filter(name => name && name !== 'NULL')
+        }
+        return []
+      }
+      
+      return {
+        constraint_name: row.constraint_name,
+        constraint_type: row.constraint_type,
+        column_names: cleanColumnNames(row.column_names),
+        foreign_table: row.foreign_table,
+        foreign_columns: cleanColumnNames(row.foreign_columns),
+        check_clause: row.check_clause
+      }
+    })
 
     // Get indexes
     const indexesResult = await this.query(`
@@ -230,12 +246,28 @@ class DatabaseSchemaManager {
       ORDER BY i.indexname
     `, [tableName])
 
-    const indexes: IndexDefinition[] = indexesResult.rows.map(row => ({
-      index_name: row.index_name,
-      column_names: Array.isArray(row.column_names) ? row.column_names : [row.column_names].filter(Boolean),
-      is_unique: row.is_unique,
-      index_type: row.index_type
-    }))
+    const indexes: IndexDefinition[] = indexesResult.rows.map(row => {
+      // Clean up column names from PostgreSQL array format
+      const cleanColumnNames = (names: any) => {
+        if (!names) return []
+        if (Array.isArray(names)) {
+          return names.filter(Boolean).map(name => 
+            typeof name === 'string' ? name.replace(/[{}]/g, '') : name
+          ).filter(name => name && name !== 'NULL')
+        }
+        if (typeof names === 'string') {
+          return names.replace(/[{}]/g, '').split(',').filter(name => name && name !== 'NULL')
+        }
+        return []
+      }
+      
+      return {
+        index_name: row.index_name,
+        column_names: cleanColumnNames(row.column_names),
+        is_unique: row.is_unique,
+        index_type: row.index_type
+      }
+    })
 
     return {
       table_name: tableName,
@@ -243,7 +275,7 @@ class DatabaseSchemaManager {
       constraints,
       indexes,
       row_count: 0, // Will be populated by getAllTables
-      is_system_table: this.isSystemTable(tableName)
+      is_system_table: await this.isSystemTable(tableName)
     }
   }
 
@@ -258,14 +290,22 @@ class DatabaseSchemaManager {
 
     // Build CREATE TABLE SQL
     const columnDefinitions = columns.map(col => {
-      let definition = `${col.column_name} ${col.data_type.toUpperCase()}`
+      let definition = `"${col.column_name}" ${col.data_type.toUpperCase()}`
       
       if (!col.is_nullable) {
         definition += ' NOT NULL'
       }
       
       if (col.column_default) {
-        definition += ` DEFAULT ${col.column_default}`
+        // Check if the default value is a string and doesn't look like a function call
+        if (typeof col.column_default === 'string' && !col.column_default.includes('(') && !col.column_default.includes(')')) {
+          // Escape single quotes within the default value
+          const escapedDefault = col.column_default.replace(/'/g, "''");
+          definition += ` DEFAULT '${escapedDefault}'`;
+        } else {
+          // For non-strings, or strings that look like function calls, use as is
+          definition += ` DEFAULT ${col.column_default}`;
+        }
       }
       
       if (col.is_primary_key) {
@@ -312,7 +352,7 @@ class DatabaseSchemaManager {
   // Drop a table
   async dropTable(tableName: string): Promise<boolean> {
     // Prevent dropping system tables
-    if (this.isSystemTable(tableName)) {
+    if (await this.isSystemTable(tableName)) {
       throw new Error(`Cannot delete system table: ${tableName}. System tables are protected.`)
     }
     
@@ -328,7 +368,7 @@ class DatabaseSchemaManager {
   // Add column to existing table
   async addColumn(tableName: string, columnDef: ColumnDefinition): Promise<boolean> {
     // Prevent modifying system tables
-    if (this.isSystemTable(tableName)) {
+    if (await this.isSystemTable(tableName)) {
       throw new Error(`Cannot modify system table: ${tableName}. System tables are protected.`)
     }
     
@@ -354,7 +394,7 @@ class DatabaseSchemaManager {
   // Drop column from table
   async dropColumn(tableName: string, columnName: string): Promise<boolean> {
     // Prevent modifying system tables
-    if (this.isSystemTable(tableName)) {
+    if (await this.isSystemTable(tableName)) {
       throw new Error(`Cannot modify system table: ${tableName}. System tables are protected.`)
     }
     
@@ -400,7 +440,7 @@ class DatabaseSchemaManager {
   // Insert row into table
   async insertRow(tableName: string, data: TableData): Promise<TableData> {
     // Prevent modifying system tables
-    if (this.isSystemTable(tableName)) {
+    if (await this.isSystemTable(tableName)) {
       throw new Error(`Cannot modify system table: ${tableName}. System tables are protected.`)
     }
     
@@ -421,7 +461,7 @@ class DatabaseSchemaManager {
   // Update row in table
   async updateRow(tableName: string, id: string, data: TableData): Promise<TableData> {
     // Prevent modifying system tables
-    if (this.isSystemTable(tableName)) {
+    if (await this.isSystemTable(tableName)) {
       throw new Error(`Cannot modify system table: ${tableName}. System tables are protected.`)
     }
     
@@ -443,7 +483,7 @@ class DatabaseSchemaManager {
   // Delete row from table
   async deleteRow(tableName: string, id: string): Promise<boolean> {
     // Prevent modifying system tables
-    if (this.isSystemTable(tableName)) {
+    if (await this.isSystemTable(tableName)) {
       throw new Error(`Cannot modify system table: ${tableName}. System tables are protected.`)
     }
     
