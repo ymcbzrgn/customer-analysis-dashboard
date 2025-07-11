@@ -309,11 +309,18 @@ class PostgreSQLDatabase {
   }
 
   async createCustomer(customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<Customer> {
+    // First, get the next available ID
+    const nextIdResult = await this.query(`
+      SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM customers
+    `)
+    const nextId = nextIdResult.rows[0].next_id
+
     const result = await this.query(`
-      INSERT INTO customers (name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO customers (id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at
     `, [
+      nextId,
       customerData.name,
       customerData.website,
       customerData.contact_email,

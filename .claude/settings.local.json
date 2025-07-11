@@ -14,7 +14,11 @@
       "Bash(grep:*)",
       "Bash(docker exec:*)",
       "Bash(ls:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(sudo service:*)",
+      "Bash(sudo systemctl start:*)",
+      "Bash(dockerd:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

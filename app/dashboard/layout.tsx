@@ -15,15 +15,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { BarChart3, Users, Settings, Menu, X, Home, LogOut, User } from "lucide-react"
+import { BarChart3, Users, Settings, Menu, X, Home, LogOut, User, Database } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import ProtectedRoute from "@/components/ProtectedRoute"
 
-const navigation = [
+// Base navigation for all users
+const baseNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Customer Analysis", href: "/dashboard/customers", icon: Users },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
+]
+
+// Admin-only navigation items
+const adminNavigation = [
+  { name: "Data Library", href: "/dashboard/data-library", icon: Database },
 ]
 
 export default function DashboardLayout({
@@ -34,6 +40,15 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const { user, logout } = useAuth()
+
+  // Get navigation items based on user role
+  const getNavigationItems = () => {
+    const navigation = [...baseNavigation]
+    if (user?.role === 'admin') {
+      navigation.push(...adminNavigation)
+    }
+    return navigation
+  }
 
   const handleLogout = () => {
     logout()
@@ -57,7 +72,7 @@ export default function DashboardLayout({
             </Button>
           </div>
           <nav className="flex-1 px-4 py-4 space-y-1">
-            {navigation.map((item) => {
+            {getNavigationItems().map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link
@@ -92,7 +107,7 @@ export default function DashboardLayout({
             </div>
           </div>
           <nav className="flex-1 px-4 py-4 space-y-1">
-            {navigation.map((item) => {
+            {getNavigationItems().map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link

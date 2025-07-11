@@ -50,6 +50,20 @@ export const LoginSchema = z.object({
     .min(1, 'Password is required')
 })
 
+export const RegisterSchema = z.object({
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(255, 'Name must be less than 255 characters')
+    .trim(),
+  email: z.string()
+    .email('Invalid email format')
+    .max(255, 'Email must be less than 255 characters')
+    .toLowerCase(),
+  password: z.string()
+    .min(6, 'Password must be at least 6 characters')
+    .max(255, 'Password must be less than 255 characters')
+})
+
 // API Response schemas
 export const ApiResponseSchema = z.object({
   success: z.boolean(),
@@ -72,6 +86,10 @@ export function validateChangePassword(data: unknown) {
 
 export function validateLogin(data: unknown) {
   return LoginSchema.safeParse(data)
+}
+
+export function validateRegister(data: unknown) {
+  return RegisterSchema.safeParse(data)
 }
 
 // Sanitization functions

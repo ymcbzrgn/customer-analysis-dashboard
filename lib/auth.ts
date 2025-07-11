@@ -28,6 +28,9 @@ export function verifyJWT(token: string): JWTPayload | null {
   }
 }
 
+// Alias for consistency
+export const verifyToken = verifyJWT
+
 // Password Functions
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS)
