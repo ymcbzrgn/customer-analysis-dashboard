@@ -62,23 +62,11 @@ export interface CreateTableRequest {
     foreign_columns?: string[]
     check_clause?: string
   }[]
+  is_system_table?: boolean
 }
 
 class DatabaseSchemaManager {
   private static instance: DatabaseSchemaManager
-
-  // Define system tables - these are core application tables that shouldn't be edited
-  private static readonly SYSTEM_TABLES = [
-    'users',
-    'customers', 
-    'customer_status',
-    'customer_classifications',
-    'dorks',
-    'email',
-    'industries',
-    'one_time',
-    'user_preferences'
-  ]
 
   private constructor() {
     // Use the existing database instance
@@ -96,13 +84,22 @@ class DatabaseSchemaManager {
   }
 
   // Helper method to check if a table is a system table
-  private isSystemTable(tableName: string): boolean {
-    return DatabaseSchemaManager.SYSTEM_TABLES.includes(tableName.toLowerCase())
+  private async isSystemTable(tableName: string): Promise<boolean> {
+    const result = await this.query(`
+      SELECT d.description
+      FROM pg_description d
+      JOIN pg_class c ON c.oid = d.objoid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = $1
+        AND n.nspname = 'public'
+    `, [tableName]);
+
+    return result.rows[0]?.description === 'system_table';
   }
 
   // Public method to check if a table is a system table
-  public isTableSystemTable(tableName: string): boolean {
-    return this.isSystemTable(tableName)
+  public async isTableSystemTable(tableName: string): Promise<boolean> {
+    return await this.isSystemTable(tableName)
   }
 
   // Get all tables in the database
@@ -110,9 +107,11 @@ class DatabaseSchemaManager {
     const result = await this.query(`
       SELECT 
         t.table_name,
-        COALESCE(tc.n_tup_ins - tc.n_tup_del, 0) as row_count
+        COALESCE(tc.n_tup_ins - tc.n_tup_del, 0) as row_count,
+        d.description AS table_comment
       FROM information_schema.tables t
       LEFT JOIN pg_stat_user_tables tc ON t.table_name = tc.relname
+      LEFT JOIN pg_description d ON d.objoid = (quote_ident(t.table_schema) || '.' || quote_ident(t.table_name))::regclass::oid
       WHERE t.table_schema = 'public'
         AND t.table_type = 'BASE TABLE'
       ORDER BY t.table_name
@@ -125,7 +124,7 @@ class DatabaseSchemaManager {
       tables.push({
         ...tableSchema,
         row_count: parseInt(row.row_count) || 0,
-        is_system_table: this.isSystemTable(row.table_name)
+        is_system_table: row.table_comment === 'system_table'
       })
     }
 
@@ -250,7 +249,7 @@ class DatabaseSchemaManager {
 
   // Create a new table
   async createTable(tableRequest: CreateTableRequest): Promise<boolean> {
-    const { table_name, columns, constraints = [] } = tableRequest
+    const { table_name, columns, constraints = [], is_system_table = false } = tableRequest
 
     // Validate table name
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table_name)) {
@@ -300,6 +299,9 @@ class DatabaseSchemaManager {
 
     try {
       await this.query(createTableSQL)
+      if (is_system_table) {
+        await this.query(`COMMENT ON TABLE ${table_name} IS 'system_table';`);
+      }
       return true
     } catch (error) {
       console.error('Create table error:', error)

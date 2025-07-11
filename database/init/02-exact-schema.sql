@@ -96,6 +96,12 @@ CREATE TABLE users (
 );
 
 -- Add foreign key constraints as specified in the CSV
+COMMENT ON TABLE customer_classifications IS 'system_table';
+COMMENT ON TABLE customer_status IS 'system_table';
+COMMENT ON TABLE customers IS 'system_table';
+COMMENT ON TABLE dorks IS 'system_table';
+COMMENT ON TABLE users IS 'system_table';
+
 ALTER TABLE customer_classifications 
 ADD CONSTRAINT customer_classifications_customer_id_fkey 
 FOREIGN KEY (customer_id) REFERENCES customers(id);
