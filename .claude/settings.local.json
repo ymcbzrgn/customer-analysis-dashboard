@@ -18,7 +18,8 @@
       "Bash(sudo service:*)",
       "Bash(sudo systemctl start:*)",
       "Bash(dockerd:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

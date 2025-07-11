@@ -39,7 +39,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Copy,
-  Paste,
+  Clipboard,
   Undo,
   Redo
 } from 'lucide-react'
@@ -758,7 +758,7 @@ export default function DataGridModal({ open, onClose, tableName, isSystemTable 
                   disabled={!selectedCell}
                   title="Paste (Ctrl+V)"
                 >
-                  <Paste className="h-4 w-4" />
+                  <Clipboard className="h-4 w-4" />
                 </Button>
                 <Button
                   size="sm"

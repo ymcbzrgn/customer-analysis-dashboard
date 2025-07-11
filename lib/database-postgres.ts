@@ -45,6 +45,44 @@ export interface UserPreferences {
   updated_at: Date
 }
 
+export interface Chart {
+  id: string
+  name: string
+  description?: string
+  config: ChartConfig
+  source_table_name?: string
+  chart_type: 'bar' | 'line' | 'pie' | 'area' | 'scatter'
+  is_public: boolean
+  created_at: Date
+  updated_at: Date
+  created_by: number
+}
+
+export interface ChartConfig {
+  type: 'bar' | 'line' | 'pie' | 'area' | 'scatter'
+  data: {
+    source: string // 'custom' for manual data, or table name
+    values?: Array<{ [key: string]: any }> // For custom data
+    groupBy?: string // Column to group by
+    aggregation?: 'count' | 'sum' | 'avg' | 'min' | 'max'
+    valueColumn?: string // Column to aggregate
+    joinTable?: string // For related table data
+  }
+  display: {
+    title: string
+    xAxis: string
+    yAxis: string
+    color?: string
+    colors?: string[]
+    showLegend?: boolean
+    showGrid?: boolean
+  }
+  filters?: {
+    dateRange?: { from: Date; to: Date }
+    conditions?: Array<{ column: string; operator: string; value: any }>
+  }
+}
+
 class PostgreSQLDatabase {
   private static instance: PostgreSQLDatabase
   private pool: Pool
@@ -420,6 +458,209 @@ class PostgreSQLDatabase {
     `, [userId])
 
     return result.rows[0]
+  }
+
+  // Chart operations
+  async getAllCharts(): Promise<Chart[]> {
+    const result = await this.query(`
+      SELECT 
+        c.id,
+        c.name,
+        c.description,
+        c.config,
+        c.source_table_name,
+        c.chart_type,
+        c.is_public,
+        c.created_at,
+        c.updated_at,
+        c.created_by,
+        u.name as created_by_name
+      FROM charts c
+      LEFT JOIN users u ON c.created_by = u.id
+      ORDER BY c.updated_at DESC
+    `)
+    return result.rows
+  }
+
+  async getChartById(id: string): Promise<Chart | null> {
+    const result = await this.query(`
+      SELECT 
+        c.id,
+        c.name,
+        c.description,
+        c.config,
+        c.source_table_name,
+        c.chart_type,
+        c.is_public,
+        c.created_at,
+        c.updated_at,
+        c.created_by,
+        u.name as created_by_name
+      FROM charts c
+      LEFT JOIN users u ON c.created_by = u.id
+      WHERE c.id = $1
+    `, [id])
+    return result.rows[0] || null
+  }
+
+  async getChartsByTable(tableName: string): Promise<Chart[]> {
+    const result = await this.query(`
+      SELECT 
+        c.id,
+        c.name,
+        c.description,
+        c.config,
+        c.source_table_name,
+        c.chart_type,
+        c.is_public,
+        c.created_at,
+        c.updated_at,
+        c.created_by,
+        u.name as created_by_name
+      FROM charts c
+      LEFT JOIN users u ON c.created_by = u.id
+      WHERE c.source_table_name = $1
+      ORDER BY c.updated_at DESC
+    `, [tableName])
+    return result.rows
+  }
+
+  async getPublicCharts(): Promise<Chart[]> {
+    const result = await this.query(`
+      SELECT 
+        c.id,
+        c.name,
+        c.description,
+        c.config,
+        c.source_table_name,
+        c.chart_type,
+        c.is_public,
+        c.created_at,
+        c.updated_at,
+        c.created_by,
+        u.name as created_by_name
+      FROM charts c
+      LEFT JOIN users u ON c.created_by = u.id
+      WHERE c.is_public = true
+      ORDER BY c.updated_at DESC
+    `)
+    return result.rows
+  }
+
+  async createChart(chartData: {
+    name: string
+    description?: string
+    config: ChartConfig
+    source_table_name?: string
+    chart_type: string
+    is_public?: boolean
+    created_by: number
+  }): Promise<Chart> {
+    const result = await this.query(`
+      INSERT INTO charts (name, description, config, source_table_name, chart_type, is_public, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, name, description, config, source_table_name, chart_type, is_public, created_at, updated_at, created_by
+    `, [
+      chartData.name,
+      chartData.description || null,
+      JSON.stringify(chartData.config),
+      chartData.source_table_name || null,
+      chartData.chart_type,
+      chartData.is_public || false,
+      chartData.created_by
+    ])
+    return result.rows[0]
+  }
+
+  async updateChart(id: string, chartData: {
+    name?: string
+    description?: string
+    config?: ChartConfig
+    source_table_name?: string
+    chart_type?: string
+    is_public?: boolean
+  }): Promise<Chart | null> {
+    const fields = []
+    const values = []
+    let paramIndex = 1
+
+    Object.entries(chartData).forEach(([key, value]) => {
+      if (value !== undefined) {
+        if (key === 'config') {
+          fields.push(`${key} = $${paramIndex}`)
+          values.push(JSON.stringify(value))
+        } else {
+          fields.push(`${key} = $${paramIndex}`)
+          values.push(value)
+        }
+        paramIndex++
+      }
+    })
+
+    if (fields.length === 0) return null
+
+    values.push(id)
+    const result = await this.query(`
+      UPDATE charts 
+      SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $${paramIndex}
+      RETURNING id, name, description, config, source_table_name, chart_type, is_public, created_at, updated_at, created_by
+    `, values)
+
+    return result.rows[0] || null
+  }
+
+  async deleteChart(id: string): Promise<boolean> {
+    const result = await this.query(`
+      DELETE FROM charts WHERE id = $1
+    `, [id])
+    return result.rowCount > 0
+  }
+
+  // Get chart data for rendering
+  async getChartData(chartId: string): Promise<any> {
+    const chart = await this.getChartById(chartId)
+    if (!chart) return null
+
+    const config = chart.config
+    
+    // Handle custom data charts
+    if (config.data.source === 'custom') {
+      return config.data.values || []
+    }
+
+    // Handle table-based charts
+    if (config.data.source && config.data.source !== 'custom') {
+      const tableName = config.data.source
+      
+      // Build query based on chart configuration
+      let query = `SELECT `
+      let params = []
+      
+      if (config.data.groupBy && config.data.aggregation) {
+        const aggregationCol = config.data.valueColumn || 'id'
+        const aggregationFunc = config.data.aggregation.toUpperCase()
+        
+        query += `${config.data.groupBy} as category, ${aggregationFunc}(${aggregationCol}) as value`
+        query += ` FROM ${tableName}`
+        
+        // Add joins if needed
+        if (config.data.joinTable) {
+          query += ` LEFT JOIN ${config.data.joinTable} ON ${tableName}.${config.data.groupBy}_id = ${config.data.joinTable}.id`
+        }
+        
+        query += ` GROUP BY ${config.data.groupBy}`
+        query += ` ORDER BY ${config.data.groupBy}`
+      } else {
+        // Simple select all
+        query += `* FROM ${tableName} ORDER BY id LIMIT 100`
+      }
+      
+      const result = await this.query(query, params)
+      return result.rows
+    }
+
+    return []
   }
 }
 
