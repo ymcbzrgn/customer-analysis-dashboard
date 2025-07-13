@@ -1,520 +1,592 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import React, { useState, useEffect } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Plus, BarChart3, Network, Database, Palette, Settings, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
-import { 
-  Save, 
-  X, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Eye, 
-  Database,
-  BarChart3,
-  PieChart,
-  LineChart,
-  TrendingUp
-} from 'lucide-react'
-
-// ReactFlow imports
-import ReactFlow, {
-  Node,
-  Edge,
-  addEdge,
-  Connection,
-  useNodesState,
-  useEdgesState,
-  Controls,
-  Background,
-  NodeTypes,
-  Handle,
-  Position,
-  NodeProps,
-  EdgeProps,
-} from 'reactflow'
-import 'reactflow/dist/style.css'
+import { ChartConfig } from '@/lib/database-postgres'
 
 interface CreateChartModalProps {
-  open: boolean
-  onClose: () => void
-  onSuccess: () => void
-  editChart?: Chart | null
+  onChartCreated?: (chart: any) => void
+  trigger?: React.ReactNode
 }
 
-interface Chart {
-  id?: string
-  name: string
-  description?: string
-  config: ChartConfig
-  source_table_name?: string
-  chart_type: 'bar' | 'line' | 'pie' | 'area'
-  is_public: boolean
-  created_at?: string
-  updated_at?: string
-  created_by?: number
-  created_by_name?: string
-  node_count?: number
-  has_custom_data?: boolean
-}
-
-interface ChartConfig {
-  nodes: Node[]
-  edges: Edge[]
-  metadata?: {
-    layout?: string
-    theme?: string
-    [key: string]: any
-  }
-}
-
-interface TableSchema {
+interface TableData {
   table_name: string
   columns: Array<{
     column_name: string
     data_type: string
     is_nullable: boolean
-    is_primary_key: boolean
-    is_foreign_key: boolean
   }>
+  row_count: number
 }
 
-// Custom node component
-const CustomNode = ({ data, isConnectable }: NodeProps) => {
-  return (
-    <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-gray-200">
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={isConnectable}
-      />
-      <div className="flex items-center gap-2">
-        {data.icon && <data.icon className="h-4 w-4" />}
-        <div>
-          <div className="text-sm font-medium">{data.label}</div>
-          {data.sublabel && <div className="text-xs text-gray-500">{data.sublabel}</div>}
-        </div>
-      </div>
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={isConnectable}
-      />
-    </div>
-  )
-}
-
-// Custom edge component
-const CustomEdge = ({ sourceX, sourceY, targetX, targetY, data }: EdgeProps) => {
-  const edgePath = `M ${sourceX} ${sourceY} C ${sourceX} ${sourceY + 50} ${targetX} ${targetY - 50} ${targetX} ${targetY}`
-  
-  return (
-    <path
-      d={edgePath}
-      stroke={data?.color || '#b1b1b7'}
-      strokeWidth={2}
-      fill="none"
-      className="react-flow__edge-path"
-    />
-  )
-}
-
-const nodeTypes: NodeTypes = {
-  custom: CustomNode,
-}
-
-const initialNodes: Node[] = [
-  {
-    id: '1',
-    type: 'custom',
-    position: { x: 100, y: 100 },
-    data: { 
-      label: 'Start Node',
-      sublabel: 'Chart beginning',
-      icon: BarChart3
-    },
-  },
-]
-
-const initialEdges: Edge[] = []
-
-export default function CreateChartModal({ open, onClose, onSuccess, editChart }: CreateChartModalProps) {
+export default function CreateChartModal({ onChartCreated, trigger }: CreateChartModalProps) {
+  const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [tables, setTables] = useState<TableSchema[]>([])
-  const [activeTab, setActiveTab] = useState<'basic' | 'editor'>('basic')
+  const [tables, setTables] = useState<TableData[]>([])
+  const [chartMode, setChartMode] = useState<'data' | 'visual'>('data')
   
-  // Chart form state
-  const [chartName, setChartName] = useState('')
-  const [chartDescription, setChartDescription] = useState('')
-  const [chartType, setChartType] = useState<'bar' | 'line' | 'pie' | 'area'>('bar')
-  const [sourceTable, setSourceTable] = useState<string>('')
-  const [isPublic, setIsPublic] = useState(false)
-  
-  // ReactFlow state
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
-  const [nodeIdCounter, setNodeIdCounter] = useState(2)
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    isPublic: false
+  })
 
-  // Load tables for data source selection
-  const fetchTables = async () => {
-    try {
-      const response = await fetch('/api/data-library/tables')
-      const data = await response.json()
-      
-      if (data.success) {
-        setTables(data.tables.filter((table: TableSchema) => !table.is_system_table))
-      }
-    } catch (error) {
-      toast.error('Failed to load tables')
-    }
-  }
+  // Data chart state
+  const [dataChart, setDataChart] = useState({
+    type: 'bar' as const,
+    sourceTable: '',
+    groupBy: '',
+    valueColumn: '',
+    aggregation: 'count' as const,
+    title: '',
+    xAxis: '',
+    yAxis: '',
+    color: '#3b82f6'
+  })
 
+  // Visual chart state
+  const [visualChart, setVisualChart] = useState({
+    type: 'flow' as const,
+    direction: 'horizontal' as const,
+    autoLayout: true,
+    spacing: { x: 200, y: 100 },
+    nodes: [] as any[],
+    edges: [] as any[]
+  })
+
+  // Load tables on mount
   useEffect(() => {
-    if (open) {
-      fetchTables()
-      
-      // Reset form for new chart
-      if (!editChart) {
-        setChartName('')
-        setChartDescription('')
-        setChartType('bar')
-        setSourceTable('')
-        setIsPublic(false)
-        setNodes(initialNodes)
-        setEdges(initialEdges)
-        setNodeIdCounter(2)
-        setActiveTab('basic')
-      } else {
-        // Load existing chart data
-        setChartName(editChart.name)
-        setChartDescription(editChart.description || '')
-        setChartType(editChart.chart_type)
-        setSourceTable(editChart.source_table_name || '')
-        setIsPublic(editChart.is_public)
-        
-        if (editChart.config.nodes && editChart.config.edges) {
-          setNodes(editChart.config.nodes)
-          setEdges(editChart.config.edges)
+    const loadTables = async () => {
+      try {
+        const response = await fetch('/api/data-library/tables')
+        if (response.ok) {
+          const data = await response.json()
+          setTables(data.tables || [])
         }
+      } catch (error) {
+        console.error('Failed to load tables:', error)
       }
     }
-  }, [open, editChart])
-
-  // ReactFlow event handlers
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  )
-
-  const addNode = useCallback(() => {
-    const newNode: Node = {
-      id: nodeIdCounter.toString(),
-      type: 'custom',
-      position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
-      data: { 
-        label: `Node ${nodeIdCounter}`,
-        sublabel: 'Data point',
-        icon: Database
-      },
+    
+    if (open) {
+      loadTables()
     }
-    setNodes((nds) => [...nds, newNode])
-    setNodeIdCounter(nodeIdCounter + 1)
-  }, [nodeIdCounter, setNodes])
+  }, [open])
 
-  const deleteNode = useCallback((nodeId: string) => {
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId))
-    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
-  }, [setNodes, setEdges])
-
-  const getChartTypeIcon = (type: string) => {
-    switch (type) {
-      case 'bar': return BarChart3
-      case 'line': return LineChart
-      case 'pie': return PieChart
-      case 'area': return TrendingUp
-      default: return BarChart3
-    }
+  // Get columns for selected table
+  const getTableColumns = (tableName: string) => {
+    const table = tables.find(t => t.table_name === tableName)
+    return table?.columns || []
   }
 
-  const handleSave = async () => {
-    // Validation
-    if (!chartName.trim()) {
-      toast.error('Chart name is required')
-      return
-    }
+  // Reset form
+  const resetForm = () => {
+    setFormData({ name: '', description: '', isPublic: false })
+    setDataChart({
+      type: 'bar',
+      sourceTable: '',
+      groupBy: '',
+      valueColumn: '',
+      aggregation: 'count',
+      title: '',
+      xAxis: '',
+      yAxis: '',
+      color: '#3b82f6'
+    })
+    setVisualChart({
+      type: 'flow',
+      direction: 'horizontal',
+      autoLayout: true,
+      spacing: { x: 200, y: 100 },
+      nodes: [],
+      edges: []
+    })
+  }
 
-    if (nodes.length === 0) {
-      toast.error('Chart must have at least one node')
+  // Add sample nodes for visual chart
+  const addSampleNodes = () => {
+    const sampleNodes = [
+      {
+        id: 'ceo',
+        type: 'employee',
+        data: {
+          label: 'John Smith',
+          sublabel: 'Chief Executive Officer',
+          department: 'Executive',
+          level: 1,
+          email: 'john.smith@company.com',
+          employeeId: 'EMP001',
+          avatar: 'JS'
+        },
+        position: { x: 300, y: 50 }
+      },
+      {
+        id: 'cto',
+        type: 'employee',
+        data: {
+          label: 'Jane Doe',
+          sublabel: 'Chief Technology Officer',
+          department: 'Technology',
+          level: 2,
+          email: 'jane.doe@company.com',
+          employeeId: 'EMP002',
+          avatar: 'JD',
+          reportsTo: 'ceo'
+        },
+        position: { x: 150, y: 250 }
+      },
+      {
+        id: 'dev_lead',
+        type: 'employee',
+        data: {
+          label: 'Mike Johnson',
+          sublabel: 'Development Lead',
+          department: 'Engineering',
+          level: 3,
+          email: 'mike.johnson@company.com',
+          employeeId: 'EMP003',
+          avatar: 'MJ',
+          reportsTo: 'cto'
+        },
+        position: { x: 150, y: 450 }
+      }
+    ]
+    
+    const sampleEdges = [
+      { 
+        id: 'ceo-cto', 
+        source: 'ceo', 
+        target: 'cto', 
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#3b82f6', strokeWidth: 2 }
+      },
+      { 
+        id: 'cto-dev_lead', 
+        source: 'cto', 
+        target: 'dev_lead', 
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#10b981', strokeWidth: 2 }
+      }
+    ]
+
+    setVisualChart(prev => ({
+      ...prev,
+      nodes: sampleNodes,
+      edges: sampleEdges
+    }))
+  }
+
+  // Create chart
+  const handleCreate = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Please enter a chart name')
       return
     }
 
     setLoading(true)
-
     try {
-      const chartData = {
-        name: chartName,
-        description: chartDescription,
-        config: {
-          nodes,
-          edges,
-          metadata: {
-            layout: 'hierarchical',
-            theme: 'default',
-            created_at: new Date().toISOString(),
-            node_count: nodes.length,
-            edge_count: edges.length
+      let config: ChartConfig
+      let chartType: string
+
+      if (chartMode === 'data') {
+        if (!dataChart.sourceTable) {
+          toast.error('Please select a data source table')
+          return
+        }
+
+        chartType = dataChart.type
+        config = {
+          type: dataChart.type,
+          data: {
+            source: dataChart.sourceTable,
+            groupBy: dataChart.groupBy || undefined,
+            valueColumn: dataChart.valueColumn || undefined,
+            aggregation: dataChart.aggregation
+          },
+          display: {
+            title: dataChart.title || formData.name,
+            xAxis: dataChart.xAxis,
+            yAxis: dataChart.yAxis,
+            color: dataChart.color,
+            showLegend: true,
+            showGrid: true
           }
-        },
-        source_table_name: sourceTable === 'none' ? null : sourceTable || null,
-        chart_type: chartType,
-        is_public: isPublic
+        }
+      } else {
+        chartType = visualChart.type
+        config = {
+          type: visualChart.type,
+          nodes: visualChart.nodes,
+          edges: visualChart.edges,
+          flowSettings: {
+            direction: visualChart.direction,
+            spacing: visualChart.spacing,
+            autoLayout: visualChart.autoLayout
+          },
+          display: {
+            title: formData.name
+          }
+        }
       }
 
-      const url = editChart ? `/api/data-library/charts/${editChart.id}` : '/api/data-library/charts'
-      const method = editChart ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(chartData)
+      const response = await fetch('/api/data-library/charts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description,
+          config,
+          chart_type: chartType,
+          is_public: formData.isPublic,
+          source_table_name: chartMode === 'data' ? dataChart.sourceTable : null
+        })
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        toast.success(editChart ? 'Chart updated successfully' : 'Chart created successfully')
-        onSuccess()
-        onClose()
+      if (response.ok) {
+        const newChart = await response.json()
+        toast.success('Chart created successfully!')
+        onChartCreated?.(newChart)
+        setOpen(false)
+        resetForm()
       } else {
-        toast.error(result.message || 'Failed to save chart')
+        const error = await response.json()
+        toast.error(error.message || 'Failed to create chart')
       }
     } catch (error) {
-      toast.error('Failed to save chart')
+      console.error('Error creating chart:', error)
+      toast.error('Failed to create chart')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleClose = () => {
-    if (!loading) {
-      onClose()
-    }
-  }
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Chart
+          </Button>
+        )}
+      </DialogTrigger>
+      
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {(() => {
-              const IconComponent = getChartTypeIcon(chartType)
-              return <IconComponent className="h-5 w-5" />
-            })()}
-            {editChart ? 'Edit Chart' : 'Create New Chart'}
-          </DialogTitle>
+          <DialogTitle>Create New Chart</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'basic' | 'editor')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="basic">Basic Information</TabsTrigger>
-            <TabsTrigger value="editor">Chart Editor</TabsTrigger>
-          </TabsList>
+        <div className="space-y-6">
+          {/* Basic Info */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Chart Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter chart name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Input
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter chart description"
+              />
+            </div>
+          </div>
 
-          <TabsContent value="basic" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="chart-name">Chart Name *</Label>
-                <Input
-                  id="chart-name"
-                  value={chartName}
-                  onChange={(e) => setChartName(e.target.value)}
-                  placeholder="Enter chart name"
-                />
-              </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="isPublic"
+              checked={formData.isPublic}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isPublic: !!checked }))}
+            />
+            <Label htmlFor="isPublic">Make this chart public</Label>
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="chart-type">Chart Type</Label>
-                <Select value={chartType} onValueChange={(value) => setChartType(value as any)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bar">
-                      <div className="flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4" />
-                        Bar Chart
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="line">
-                      <div className="flex items-center gap-2">
-                        <LineChart className="h-4 w-4" />
-                        Line Chart
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pie">
-                      <div className="flex items-center gap-2">
-                        <PieChart className="h-4 w-4" />
-                        Pie Chart
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="area">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" />
-                        Area Chart
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="chart-description">Description</Label>
-                <Textarea
-                  id="chart-description"
-                  value={chartDescription}
-                  onChange={(e) => setChartDescription(e.target.value)}
-                  placeholder="Enter chart description"
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="source-table">Data Source (Optional)</Label>
-                <Select value={sourceTable} onValueChange={setSourceTable}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a table" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Custom Data (No Table)</SelectItem>
-                    {tables.map((table) => (
-                      <SelectItem key={table.table_name} value={table.table_name}>
-                        <div className="flex items-center gap-2">
-                          <Database className="h-4 w-4" />
-                          {table.table_name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
+          {/* Chart Mode Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <Card 
+              className={`cursor-pointer transition-all ${chartMode === 'data' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setChartMode('data')}
+            >
+              <CardHeader className="pb-3">
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is-public"
-                    checked={isPublic}
-                    onCheckedChange={(checked) => setIsPublic(checked as boolean)}
-                  />
-                  <Label htmlFor="is-public">Make chart public</Label>
+                  <BarChart3 className="h-5 w-5" />
+                  <CardTitle className="text-lg">Data Visualization</CardTitle>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Public charts can be viewed by all users
-                </p>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="editor" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Button size="sm" onClick={addNode}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Node
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Nodes: {nodes.length} | Edges: {edges.length}
-                </span>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Drag nodes to move • Click and drag from handles to create connections
-              </div>
-            </div>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Chart Editor</CardTitle>
+                <CardDescription>
+                  Create charts from database tables with aggregations and filters
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-96 border rounded-lg bg-gray-50">
-                  <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
-                    nodeTypes={nodeTypes}
-                    fitView
-                    fitViewOptions={{ padding: 0.2 }}
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="secondary">Bar</Badge>
+                  <Badge variant="secondary">Line</Badge>
+                  <Badge variant="secondary">Pie</Badge>
+                  <Badge variant="secondary">Area</Badge>
+                  <Badge variant="secondary">Scatter</Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`cursor-pointer transition-all ${chartMode === 'visual' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setChartMode('visual')}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-2">
+                  <Network className="h-5 w-5" />
+                  <CardTitle className="text-lg">Visual Flow Builder</CardTitle>
+                </div>
+                <CardDescription>
+                  Create organizational charts and process flows with drag-and-drop
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant="secondary">Flowcharts</Badge>
+                  <Badge variant="secondary">Org Charts</Badge>
+                  <Badge variant="secondary">Process Maps</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Chart Configuration */}
+          {chartMode === 'data' ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center">
+                <Database className="h-5 w-5 mr-2" />
+                Data Configuration
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Chart Type</Label>
+                  <Select 
+                    value={dataChart.type} 
+                    onValueChange={(value: any) => setDataChart(prev => ({ ...prev, type: value }))}
                   >
-                    <Background />
-                    <Controls />
-                  </ReactFlow>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bar">Bar Chart</SelectItem>
+                      <SelectItem value="line">Line Chart</SelectItem>
+                      <SelectItem value="pie">Pie Chart</SelectItem>
+                      <SelectItem value="area">Area Chart</SelectItem>
+                      <SelectItem value="scatter">Scatter Plot</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Node management */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Node Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {nodes.map((node) => (
-                    <div key={node.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <div className="flex items-center gap-2">
-                        <Database className="h-4 w-4" />
-                        <span className="text-sm font-medium">{node.data.label}</span>
-                        <span className="text-xs text-muted-foreground">{node.data.sublabel}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            // TODO: Add node edit functionality
-                            toast.info('Node editing coming soon!')
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => deleteNode(node.id)}
-                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  <Label>Data Source Table</Label>
+                  <Select 
+                    value={dataChart.sourceTable} 
+                    onValueChange={(value) => setDataChart(prev => ({ ...prev, sourceTable: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select table" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tables.map(table => (
+                        <SelectItem key={table.table_name} value={table.table_name}>
+                          {table.table_name} ({table.row_count} rows)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
 
-        <div className="flex items-center justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={handleClose} disabled={loading}>
-            <X className="h-4 w-4 mr-2" />
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={loading}>
-            <Save className="h-4 w-4 mr-2" />
-            {loading ? 'Saving...' : editChart ? 'Update Chart' : 'Create Chart'}
-          </Button>
+              {dataChart.sourceTable && (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Group By Column</Label>
+                    <Select 
+                      value={dataChart.groupBy} 
+                      onValueChange={(value) => setDataChart(prev => ({ ...prev, groupBy: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getTableColumns(dataChart.sourceTable).map(col => (
+                          <SelectItem key={col.column_name} value={col.column_name}>
+                            {col.column_name} ({col.data_type})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Value Column</Label>
+                    <Select 
+                      value={dataChart.valueColumn} 
+                      onValueChange={(value) => setDataChart(prev => ({ ...prev, valueColumn: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select column" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getTableColumns(dataChart.sourceTable)
+                          .filter(col => ['integer', 'bigint', 'numeric', 'real', 'double precision'].includes(col.data_type))
+                          .map(col => (
+                            <SelectItem key={col.column_name} value={col.column_name}>
+                              {col.column_name} ({col.data_type})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Aggregation</Label>
+                    <Select 
+                      value={dataChart.aggregation} 
+                      onValueChange={(value: any) => setDataChart(prev => ({ ...prev, aggregation: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="count">Count</SelectItem>
+                        <SelectItem value="sum">Sum</SelectItem>
+                        <SelectItem value="avg">Average</SelectItem>
+                        <SelectItem value="min">Minimum</SelectItem>
+                        <SelectItem value="max">Maximum</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>X-Axis Label</Label>
+                  <Input
+                    value={dataChart.xAxis}
+                    onChange={(e) => setDataChart(prev => ({ ...prev, xAxis: e.target.value }))}
+                    placeholder="X-axis label"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Y-Axis Label</Label>
+                  <Input
+                    value={dataChart.yAxis}
+                    onChange={(e) => setDataChart(prev => ({ ...prev, yAxis: e.target.value }))}
+                    placeholder="Y-axis label"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Color</Label>
+                  <Input
+                    type="color"
+                    value={dataChart.color}
+                    onChange={(e) => setDataChart(prev => ({ ...prev, color: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center">
+                  <Network className="h-5 w-5 mr-2" />
+                  Visual Flow Configuration
+                </h3>
+                <Button onClick={addSampleNodes} variant="outline" size="sm">
+                  Add Sample Nodes
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Chart Type</Label>
+                  <Select 
+                    value={visualChart.type} 
+                    onValueChange={(value: any) => setVisualChart(prev => ({ ...prev, type: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="flow">Flow Chart</SelectItem>
+                      <SelectItem value="organizational">Organizational Chart</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Direction</Label>
+                  <Select 
+                    value={visualChart.direction} 
+                    onValueChange={(value: any) => setVisualChart(prev => ({ ...prev, direction: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="horizontal">Horizontal</SelectItem>
+                      <SelectItem value="vertical">Vertical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-6">
+                  <Checkbox
+                    id="autoLayout"
+                    checked={visualChart.autoLayout}
+                    onCheckedChange={(checked) => setVisualChart(prev => ({ ...prev, autoLayout: !!checked }))}
+                  />
+                  <Label htmlFor="autoLayout">Auto Layout</Label>
+                </div>
+              </div>
+
+              {visualChart.nodes.length > 0 && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {visualChart.nodes.length} nodes, {visualChart.edges.length} connections
+                  </p>
+                  <div className="text-xs text-muted-foreground">
+                    You can customize this chart after creation using the visual editor
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={loading}>
+              {loading ? 'Creating...' : 'Create Chart'}
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

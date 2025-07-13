@@ -60,10 +60,11 @@ export async function GET(request: NextRequest) {
         created_at: chart.created_at,
         updated_at: chart.updated_at,
         created_by: chart.created_by,
-        created_by_name: chart.created_by_name,
-        // Add summary stats from config
-        node_count: chart.config?.data?.values?.length || 0,
-        has_custom_data: chart.config?.data?.source === 'custom'
+        // Add summary stats from config based on chart type
+        node_count: chart.config?.nodes?.length || 0,
+        edge_count: chart.config?.edges?.length || 0,
+        has_custom_data: chart.config?.data?.source === 'custom',
+        is_visual_chart: ['flow', 'organizational'].includes(chart.chart_type)
       }))
     })
   } catch (error) {
@@ -96,21 +97,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate chart type
-    const validTypes = ['bar', 'line', 'pie', 'area', 'scatter']
+    const validTypes = ['bar', 'line', 'pie', 'area', 'scatter', 'flow', 'organizational']
     if (!validTypes.includes(chart_type)) {
       return NextResponse.json({ 
         error: `Invalid chart type. Must be one of: ${validTypes.join(', ')}` 
       }, { status: 400 })
     }
 
-    // Validate config structure - support both ReactFlow and traditional chart formats
-    const isReactFlowConfig = config.nodes && Array.isArray(config.nodes)
-    const isTraditionalConfig = config.type && config.data && config.display
+    // Validate config structure based on chart type
+    const isVisualChart = ['flow', 'organizational'].includes(chart_type)
+    const isDataChart = ['bar', 'line', 'pie', 'area', 'scatter'].includes(chart_type)
     
-    if (!isReactFlowConfig && !isTraditionalConfig) {
-      return NextResponse.json({ 
-        error: 'Config must contain either ReactFlow format (nodes, edges) or traditional format (type, data, display)' 
-      }, { status: 400 })
+    if (isVisualChart) {
+      // Visual charts need nodes array (edges are optional)
+      if (!config.nodes || !Array.isArray(config.nodes)) {
+        return NextResponse.json({ 
+          error: 'Visual charts must have nodes array in config' 
+        }, { status: 400 })
+      }
+    } else if (isDataChart) {
+      // Data charts need type, data, and display
+      if (!config.type || !config.display) {
+        return NextResponse.json({ 
+          error: 'Data charts must have type and display in config' 
+        }, { status: 400 })
+      }
     }
 
     // If source_table_name is provided, validate it exists
@@ -137,7 +148,7 @@ export async function POST(request: NextRequest) {
       source_table_name,
       chart_type,
       is_public: is_public || false,
-      created_by: parseInt(userId)
+      created_by: parseInt(userId || '0')
     })
 
     return NextResponse.json({
@@ -156,7 +167,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Failed to create chart:', error)
-    if (error.code === '23505') { // Unique constraint violation
+    if ((error as any).code === '23505') { // Unique constraint violation
       return NextResponse.json({ 
         error: 'Chart name already exists' 
       }, { status: 409 })

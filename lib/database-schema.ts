@@ -283,6 +283,8 @@ class DatabaseSchemaManager {
   async createTable(tableRequest: CreateTableRequest): Promise<boolean> {
     const { table_name, columns, constraints = [], is_system_table = false } = tableRequest
 
+    const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
+
     // Validate table name
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table_name)) {
       throw new Error('Invalid table name. Must contain only letters, numbers, and underscores.')
@@ -290,20 +292,24 @@ class DatabaseSchemaManager {
 
     // Build CREATE TABLE SQL
     const columnDefinitions = columns.map(col => {
-      let definition = `"${col.column_name}" ${col.data_type.toUpperCase()}`
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(col.column_name)) {
+        throw new Error(`Invalid column name: ${col.column_name}`);
+      }
+      let definition = `${quoteIdent(col.column_name)} ${col.data_type.toUpperCase()}`
       
       if (!col.is_nullable) {
         definition += ' NOT NULL'
       }
       
       if (col.column_default) {
-        // Check if the default value is a string and doesn't look like a function call
+        // Basic validation for default value to prevent injection
+        if (typeof col.column_default === 'string' && !/^[a-zA-Z0-9_ .'()-]+$/.test(col.column_default)) {
+          throw new Error(`Invalid default value: ${col.column_default}`);
+        }
         if (typeof col.column_default === 'string' && !col.column_default.includes('(') && !col.column_default.includes(')')) {
-          // Escape single quotes within the default value
           const escapedDefault = col.column_default.replace(/'/g, "''");
           definition += ` DEFAULT '${escapedDefault}'`;
         } else {
-          // For non-strings, or strings that look like function calls, use as is
           definition += ` DEFAULT ${col.column_default}`;
         }
       }
@@ -317,13 +323,39 @@ class DatabaseSchemaManager {
 
     // Add constraints
     const constraintDefinitions = constraints.map(constraint => {
+      const quotedColumnNames = constraint.column_names.map(name => {
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+          throw new Error(`Invalid column name in constraint: ${name}`);
+        }
+        return quoteIdent(name);
+      }).join(', ');
+
       switch (constraint.constraint_type) {
         case 'FOREIGN KEY':
-          return `FOREIGN KEY (${constraint.column_names.join(', ')}) REFERENCES ${constraint.foreign_table}(${constraint.foreign_columns?.join(', ')})`
+          if (!constraint.foreign_table || !constraint.foreign_columns) {
+            throw new Error('FOREIGN KEY constraint requires foreign_table and foreign_columns.');
+          }
+          if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(constraint.foreign_table)) {
+            throw new Error(`Invalid foreign_table name in constraint: ${constraint.foreign_table}`);
+          }
+          const quotedForeignTable = quoteIdent(constraint.foreign_table);
+          const quotedForeignColumns = constraint.foreign_columns.map(name => {
+            if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+              throw new Error(`Invalid column name in foreign_columns: ${name}`);
+            }
+            return quoteIdent(name);
+          }).join(', ');
+          return `FOREIGN KEY (${quotedColumnNames}) REFERENCES ${quotedForeignTable}(${quotedForeignColumns})`
         case 'UNIQUE':
-          return `UNIQUE (${constraint.column_names.join(', ')})`
+          return `UNIQUE (${quotedColumnNames})`
         case 'CHECK':
-          return `CHECK (${constraint.check_clause})`
+          if (constraint.check_clause) {
+            if (!/^[a-zA-Z0-9_ '><=()ANDORNOT]+$/.test(constraint.check_clause)) {
+              throw new Error('Invalid CHECK clause. Only simple checks are allowed.');
+            }
+            return `CHECK (${constraint.check_clause})`
+          }
+          return ''
         default:
           return ''
       }
@@ -332,7 +364,7 @@ class DatabaseSchemaManager {
     const allDefinitions = [...columnDefinitions, ...constraintDefinitions]
     
     const createTableSQL = `
-      CREATE TABLE ${table_name} (
+      CREATE TABLE ${quoteIdent(table_name)} (
         ${allDefinitions.join(',\n        ')}
       )
     `
@@ -340,7 +372,7 @@ class DatabaseSchemaManager {
     try {
       await this.query(createTableSQL)
       if (is_system_table) {
-        await this.query(`COMMENT ON TABLE ${table_name} IS 'system_table';`);
+        await this.query(`COMMENT ON TABLE ${quoteIdent(table_name)} IS 'system_table';`);
       }
       return true
     } catch (error) {

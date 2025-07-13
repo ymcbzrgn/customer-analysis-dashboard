@@ -19,7 +19,14 @@
       "Bash(sudo systemctl start:*)",
       "Bash(dockerd:*)",
       "Bash(mkdir:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -f add-company-hierarchy-chart.sql)",
+      "WebFetch(domain:gojs.net)",
+      "WebFetch(domain:n8n.io)",
+      "Bash(npx tsc:*)",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT id, name, chart_type, config FROM charts WHERE name LIKE ''%Company%'' OR name LIKE ''%Organizational%'';\")",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -f update-org-chart.sql)",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT name, chart_type, jsonb_pretty(config) FROM charts WHERE name = ''Company Organizational Chart'';\")"
     ],
     "deny": []
   }

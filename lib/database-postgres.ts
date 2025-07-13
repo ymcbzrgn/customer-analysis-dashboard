@@ -51,7 +51,7 @@ export interface Chart {
   description?: string
   config: ChartConfig
   source_table_name?: string
-  chart_type: 'bar' | 'line' | 'pie' | 'area' | 'scatter'
+  chart_type: 'bar' | 'line' | 'pie' | 'area' | 'scatter' | 'flow' | 'organizational'
   is_public: boolean
   created_at: Date
   updated_at: Date
@@ -59,8 +59,10 @@ export interface Chart {
 }
 
 export interface ChartConfig {
-  type: 'bar' | 'line' | 'pie' | 'area' | 'scatter'
-  data: {
+  type: 'bar' | 'line' | 'pie' | 'area' | 'scatter' | 'flow' | 'organizational'
+  
+  // Data-based charts (traditional visualization)
+  data?: {
     source: string // 'custom' for manual data, or table name
     values?: Array<{ [key: string]: any }> // For custom data
     groupBy?: string // Column to group by
@@ -68,10 +70,10 @@ export interface ChartConfig {
     valueColumn?: string // Column to aggregate
     joinTable?: string // For related table data
   }
-  display: {
+  display?: {
     title: string
-    xAxis: string
-    yAxis: string
+    xAxis?: string
+    yAxis?: string
     color?: string
     colors?: string[]
     showLegend?: boolean
@@ -80,6 +82,28 @@ export interface ChartConfig {
   filters?: {
     dateRange?: { from: Date; to: Date }
     conditions?: Array<{ column: string; operator: string; value: any }>
+  }
+
+  // Visual node connection charts (flow/organizational)
+  nodes?: Array<{
+    id: string
+    type?: string
+    data: { [key: string]: any }
+    position?: { x: number; y: number }
+    style?: { [key: string]: any }
+  }>
+  edges?: Array<{
+    id: string
+    source: string
+    target: string
+    type?: string
+    data?: { [key: string]: any }
+    style?: { [key: string]: any }
+  }>
+  flowSettings?: {
+    direction: 'horizontal' | 'vertical'
+    spacing: { x: number; y: number }
+    autoLayout: boolean
   }
 }
 
@@ -302,9 +326,10 @@ class PostgreSQLDatabase {
   }
 
   async getCustomersByUser(userId: string): Promise<any[]> {
-    // Since there's no user_id in customers table, return all customers for now
-    // In production, you might want to add proper user association
-    return this.getCustomers()
+    // NOTE: There is currently no direct relationship between users and customers.
+    // This function will return an empty array until the schema is updated.
+    // To associate customers with users, a user_id foreign key should be added to the customers table.
+    return []
   }
 
   // Add method to update customer status (for approve/reject)
@@ -347,18 +372,11 @@ class PostgreSQLDatabase {
   }
 
   async createCustomer(customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<Customer> {
-    // First, get the next available ID
-    const nextIdResult = await this.query(`
-      SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM customers
-    `)
-    const nextId = nextIdResult.rows[0].next_id
-
     const result = await this.query(`
-      INSERT INTO customers (id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO customers (name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at
     `, [
-      nextId,
       customerData.name,
       customerData.website,
       customerData.contact_email,
@@ -624,6 +642,16 @@ class PostgreSQLDatabase {
 
     const config = chart.config
     
+    // Handle visual charts (flow/organizational) - they don't use database data
+    if (['flow', 'organizational'].includes(chart.chart_type)) {
+      return []
+    }
+    
+    // Handle data charts
+    if (!config.data) {
+      return []
+    }
+    
     // Handle custom data charts
     if (config.data.source === 'custom') {
       return config.data.values || []
@@ -635,13 +663,13 @@ class PostgreSQLDatabase {
       
       // Build query based on chart configuration
       let query = `SELECT `
-      let params = []
+      let params: any[] = []
       
       if (config.data.groupBy && config.data.aggregation) {
         const aggregationCol = config.data.valueColumn || 'id'
         const aggregationFunc = config.data.aggregation.toUpperCase()
         
-        query += `${config.data.groupBy} as category, ${aggregationFunc}(${aggregationCol}) as value`
+        query += `${config.data.groupBy} as name, ${aggregationFunc}(${aggregationCol}) as value`
         query += ` FROM ${tableName}`
         
         // Add joins if needed
