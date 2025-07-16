@@ -23,10 +23,25 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { userApi, User } from "@/lib/user-api"
+import { useAuth } from "@/contexts/AuthContext"
 
 // Remove mock users - we'll use real data from PostgreSQL
 
 export default function SettingsPage() {
+  const { user } = useAuth()
+
+  // Only allow admin users to access settings
+  if (user?.role !== 'admin') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto text-center">
+          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access this page. Only administrators can view settings.</p>
+        </div>
+      </div>
+    )
+  }
   const [profile, setProfile] = useState({
     name: "John Doe",
     email: "john@example.com",

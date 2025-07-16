@@ -24,12 +24,12 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 const baseNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Customer Analysis", href: "/dashboard/customers", icon: Users },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
 // Admin-only navigation items
 const adminNavigation = [
   { name: "Data Library", href: "/dashboard/data-library", icon: Database },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
 export default function DashboardLayout({
@@ -43,6 +43,7 @@ export default function DashboardLayout({
 
   // Get navigation items based on user role
   const getNavigationItems = () => {
+    console.log('getNavigationItems - user:', user)
     const navigation = [...baseNavigation]
     if (user?.role === 'admin') {
       navigation.push(...adminNavigation)
