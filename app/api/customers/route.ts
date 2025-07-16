@@ -6,19 +6,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: 'User ID is required' },
-        { status: 400 }
-      )
-    }
-
-    // Get customers for the specific user from PostgreSQL
-    const customers = await dbPostgres.getCustomersByUser(userId)
+    // For now, return all customers regardless of user (temporary fix)
+    // TODO: Add user_id column to customers table for proper user association
+    const customers = await dbPostgres.query(`
+      SELECT id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at
+      FROM customers
+      ORDER BY created_at DESC
+    `)
     
     return NextResponse.json({ 
       success: true, 
-      customers
+      customers: customers.rows
     })
 
   } catch (error) {

@@ -24,6 +24,7 @@ import ProtectedRoute from "@/components/ProtectedRoute"
 const baseNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Customer Analysis", href: "/dashboard/customers", icon: Users },
+  { name: "Customer Management", href: "/dashboard/customer_management", icon: BarChart3 },
 ]
 
 // Admin-only navigation items
