@@ -26,7 +26,7 @@ CREATE TABLE charts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     -- Foreign key to users table
-    created_by INTEGER REFERENCES users(id),
+    created_by INTEGER,
     
     -- Constraints
     CONSTRAINT charts_name_unique UNIQUE (name)
@@ -38,8 +38,8 @@ CREATE INDEX idx_charts_created_by ON charts(created_by);
 CREATE INDEX idx_charts_public ON charts(is_public);
 CREATE INDEX idx_charts_config_gin ON charts USING gin(config);
 
--- Add table comment for documentation
-COMMENT ON TABLE charts IS 'Chart management table for Data Library visualization system';
+-- Add table comment for documentation (mark as system table)
+COMMENT ON TABLE charts IS 'system_table';
 
 -- Add column comments for documentation
 COMMENT ON COLUMN charts.config IS 'Chart configuration including type, axes, styling, and data settings';
@@ -61,53 +61,30 @@ CREATE TRIGGER charts_updated_at_trigger
     FOR EACH ROW
     EXECUTE FUNCTION update_charts_updated_at();
 
--- Insert sample chart data for testing
-INSERT INTO charts (name, description, config, source_table_name, chart_type, is_public, created_by) VALUES
-('Customer Status Distribution', 'Shows distribution of customer statuses', '{
-    "type": "bar",
-    "data": {
-        "source": "customers",
-        "groupBy": "status",
-        "aggregation": "count"
-    },
-    "display": {
-        "title": "Customer Status Distribution",
-        "xAxis": "Status",
-        "yAxis": "Count",
-        "colors": ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]
-    }
-}', 'customers', 'bar', true, 1),
-
-('Industry Breakdown', 'Breakdown of customers by industry', '{
-    "type": "pie",
-    "data": {
-        "source": "customers",
-        "joinTable": "industries",
-        "groupBy": "industry",
-        "aggregation": "count"
-    },
-    "display": {
-        "title": "Industry Breakdown",
-        "colors": ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
-    }
-}', 'customers', 'pie', true, 1),
-
-('Custom Demo Chart', 'Sample independent chart with custom data', '{
-    "type": "line",
-    "data": {
-        "source": "custom",
-        "values": [
-            {"month": "Jan", "value": 120},
-            {"month": "Feb", "value": 180},
-            {"month": "Mar", "value": 150},
-            {"month": "Apr", "value": 220},
-            {"month": "May", "value": 200}
-        ]
-    },
-    "display": {
-        "title": "Monthly Trend",
-        "xAxis": "Month",
-        "yAxis": "Value",
-        "color": "#3b82f6"
-    }
-}', null, 'line', true, 1);
+-- Insert sample chart data for testing (minimal examples only)
+-- Use admin user ID (first user)
+INSERT INTO charts (name, description, config, source_table_name, chart_type, is_public, created_by) 
+SELECT 
+    'Customer Status Distribution',
+    'Shows distribution of customer statuses',
+    '{
+        "type": "bar",
+        "data": {
+            "source": "customers",
+            "groupBy": "status",
+            "aggregation": "count"
+        },
+        "display": {
+            "title": "Customer Status Distribution",
+            "xAxis": "Status",
+            "yAxis": "Count",
+            "colors": ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]
+        }
+    }',
+    'customers',
+    'bar',
+    true,
+    u.id
+FROM users u
+WHERE u.email = 'admin@example.com'
+LIMIT 1;

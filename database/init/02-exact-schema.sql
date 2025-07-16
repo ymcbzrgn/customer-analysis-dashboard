@@ -135,27 +135,11 @@ VALUES
     true
 ),
 (
-    'analyst@example.com',
-    crypt('analyst123', gen_salt('bf')),
-    'Data Analyst',
-    'user',
-    ARRAY['customers.read', 'customers.write', 'analytics.read'],
-    true
-),
-(
-    'viewer@example.com',
-    crypt('viewer123', gen_salt('bf')),
-    'Viewer User',
+    'user@example.com',
+    crypt('user123', gen_salt('bf')),
+    'Regular User',
     'user',
     ARRAY['customers.read', 'analytics.read'],
-    true
-),
-(
-    'manager@example.com',
-    crypt('manager123', gen_salt('bf')),
-    'Manager User',
-    'user',
-    ARRAY['customers.read', 'customers.write', 'users.read', 'analytics.read'],
     true
 )
 ON CONFLICT (email) DO NOTHING;

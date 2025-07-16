@@ -6,7 +6,7 @@ Enterprise PostgreSQL + Next.js müşteri analiz platformu.
 
 ### Gereksinimler
 - Windows 11/10 + WSL2
-- Docker Desktop
+- Docker Desktop (WSL2 entegrasyonu zorunlu)
 - Node.js 18+
 
 ### Adımlar
@@ -18,11 +18,14 @@ wsl --set-default-version 2
 
 # 2. Docker Desktop Kurulumu
 # https://docs.docker.com/desktop/install/windows-install/
-# WSL2 backend etkinleştir
+# İndirip kurun, sonra:
+# Docker Desktop > Settings > Resources > WSL Integration
+# "Enable integration with my default WSL distro" ✓
+# "Enable integration with additional distros: Ubuntu" ✓
 
 # 3. WSL2 Terminal
 wsl
-cd /mnt/c/Users/[KULLANICI_ADI]/Downloads
+cd /mnt/c/Users/[KULLANICI_ADI]/Desktop  # veya Downloads
 git clone [REPO_URL]
 cd customer-analysis-dashboard
 
@@ -30,7 +33,12 @@ cd customer-analysis-dashboard
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# 5. Çalıştırma
+# 5. Docker Test (ÖNEMLİ!)
+docker --version
+docker-compose --version
+# Bu komutlar çalışmazsa aşağıdaki düzeltmeleri uygulayın
+
+# 6. Çalıştırma
 npm run db:start
 npm install --legacy-peer-deps
 npm run dev
@@ -61,28 +69,75 @@ docker-compose logs -f
 
 ## 🛠️ Sorun Giderme
 
-### Docker Sorunu
+### ❌ "docker-compose could not be found" Hatası
+
+**Sorun**: WSL2'de docker-compose bulunamıyor
+
+**Çözüm 1: Docker Desktop WSL2 Entegrasyonu**
 ```bash
-docker version
-docker-compose ps
-docker-compose restart
+# Docker Desktop açın
+# Settings > Resources > WSL Integration
+# "Enable integration with my default WSL distro" ✓
+# "Enable integration with additional distros: Ubuntu" ✓
+# Apply & Restart
+
+# WSL2 yeniden başlatın
+wsl --shutdown
+wsl
+
+# Test edin
+docker --version
+docker-compose --version
 ```
 
-### Port Çakışması
+**Çözüm 2: Docker Desktop Yeniden Başlatma**
+```bash
+# Windows'da Docker Desktop'ı tamamen kapatın
+# Docker Desktop'ı yeniden başlatın
+# WSL2 terminali yeniden açın
+wsl
+cd /mnt/c/Users/[KULLANICI_ADI]/Desktop/customer-analysis-dashboard
+docker-compose --version
+```
+
+**Çözüm 3: Manuel Docker Compose Kurulumu**
+```bash
+# WSL2 içinde
+sudo apt update
+sudo apt install docker-compose
+
+# Test edin
+docker-compose --version
+```
+
+### ❌ Docker Daemon Hatası
+
+**Sorun**: Cannot connect to Docker daemon
+
+**Çözüm**:
+```bash
+# Docker Desktop çalışıyor mu kontrol edin
+# Windows'da Docker Desktop'ı başlatın
+# WSL2 terminali yeniden açın
+wsl
+sudo service docker start  # gerekirse
+```
+
+### ❌ Port Çakışması
 ```bash
 netstat -ano | findstr :5432
 netstat -ano | findstr :8080
 # docker-compose.yml'de port değiştir
 ```
 
-### WSL2 Sorunu
+### ❌ WSL2 Sorunu
 ```bash
 wsl --shutdown
 wsl
 docker context use default
 ```
 
-### npm Sorunu
+### ❌ npm Sorunu
 ```bash
 npm cache clean --force
 rm -rf node_modules package-lock.json
@@ -143,12 +198,33 @@ docker exec -i customer_analysis_postgres psql -U postgres customer_analysis_db 
 
 **Hızlı Test:**
 ```bash
+# Docker çalışıyor mu?
+docker --version
+docker-compose --version
+
 # Herşey çalışıyor mu?
 docker-compose ps
 curl http://localhost:3000
 curl http://localhost:8080
 ```
 
+## 🆘 Acil Durum Kurtarma
+
+**Hiçbir şey çalışmıyorsa:**
+```bash
+# 1. Her şeyi sıfırla
+wsl --shutdown
+# Docker Desktop'ı tamamen kapat
+
+# 2. Docker Desktop'ı yeniden başlat
+# 3. WSL2 Integration'ı aktif et
+# 4. Yeniden dene
+wsl
+cd /mnt/c/Users/[KULLANICI_ADI]/Desktop/customer-analysis-dashboard
+docker-compose --version
+npm run db:start
+```
+
 ---
 
-**Hızlı Başlangıç**: `npm run db:start && npm install --legacy-peer-deps && npm run dev`
+**Hızlı Başlangıç**: `docker-compose --version && npm run db:start && npm install --legacy-peer-deps && npm run dev`

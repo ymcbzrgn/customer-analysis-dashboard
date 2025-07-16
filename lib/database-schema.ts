@@ -111,7 +111,12 @@ class DatabaseSchemaManager {
         d.description AS table_comment
       FROM information_schema.tables t
       LEFT JOIN pg_stat_user_tables tc ON t.table_name = tc.relname
-      LEFT JOIN pg_description d ON d.objoid = (quote_ident(t.table_schema) || '.' || quote_ident(t.table_name))::regclass::oid
+      LEFT JOIN pg_description d ON d.objoid = (
+        SELECT c.oid 
+        FROM pg_class c 
+        JOIN pg_namespace n ON n.oid = c.relnamespace 
+        WHERE c.relname = t.table_name AND n.nspname = 'public'
+      )
       WHERE t.table_schema = 'public'
         AND t.table_type = 'BASE TABLE'
       ORDER BY t.table_name
