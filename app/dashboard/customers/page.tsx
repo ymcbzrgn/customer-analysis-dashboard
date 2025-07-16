@@ -33,6 +33,10 @@ import {
   Twitter,
   Facebook,
   Instagram,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react"
 
 interface Customer {
@@ -68,6 +72,10 @@ export default function CustomersPage() {
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<Customer | null>(null)
   const [detailModalComment, setDetailModalComment] = useState("")
   const [isEditingComment, setIsEditingComment] = useState(false)
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [recordsPerPage] = useState(10)
 
   // Load customers from API on component mount
   useEffect(() => {
@@ -130,6 +138,18 @@ export default function CustomersPage() {
 
     return matchesSearch && matchesIndustry && matchesStatus && matchesScore
   })
+
+  // Pagination calculations
+  const totalRecords = filteredCustomers.length
+  const totalPages = Math.ceil(totalRecords / recordsPerPage)
+  const startIndex = (currentPage - 1) * recordsPerPage
+  const endIndex = startIndex + recordsPerPage
+  const currentCustomers = filteredCustomers.slice(startIndex, endIndex)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, industryFilter, statusFilter, scoreRange])
 
   const handleStatusChange = async (customerId: string, newStatus: "approved" | "rejected") => {
     try {
@@ -376,7 +396,9 @@ export default function CustomersPage() {
       {/* Customer Table */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Customer List ({filteredCustomers.length})</CardTitle>
+          <CardTitle className="text-lg font-semibold">
+            Customer List 
+          </CardTitle>
           <CardDescription>Detailed view of all customer leads and their analysis results</CardDescription>
         </CardHeader>
         <CardContent>
@@ -419,7 +441,7 @@ export default function CustomersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCustomers.map((customer) => (
+                  currentCustomers.map((customer) => (
                     <TableRow key={customer.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
@@ -544,6 +566,92 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination */}
+          {totalRecords > recordsPerPage && (
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, totalRecords)}</span> of <span className="font-medium">{totalRecords}</span> entries
+              </div>
+              <div className="flex items-center space-x-1">
+                {/* First page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                
+                {/* Previous page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                {/* Page numbers - show only first 5 pages */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map(page => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="min-w-[36px] px-3 py-1.5 text-sm"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  
+                  {/* Show ellipsis if there are more than 5 pages */}
+                  {totalPages > 5 && (
+                    <span className="px-2 py-1.5 text-sm text-gray-500">...</span>
+                  )}
+                  
+                  {/* Show last page number if it's not already shown */}
+                  {totalPages > 5 && (
+                    <Button
+                      variant={currentPage === totalPages ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="min-w-[36px] px-3 py-1.5 text-sm"
+                    >
+                      {totalPages}
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Next page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                
+                {/* Last page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
       {/* Customer Detail Dialog */}
