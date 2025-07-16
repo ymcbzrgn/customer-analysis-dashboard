@@ -43,26 +43,25 @@ export default function SettingsPage() {
     )
   }
   const [profile, setProfile] = useState({
-    name: "John Doe",
-    email: "john@example.com",
-    company: "Analytics Corp",
-    role: "Data Analyst",
-    bio: "Experienced data analyst specializing in customer insights and automation.",
+    name: user?.name || "",
+    email: user?.email || "",
+    company: "",
+    role: user?.role || "",
+    bio: "",
   })
 
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    pushNotifications: false,
-    weeklyReports: true,
-    systemUpdates: true,
-  })
-
-  const [preferences, setPreferences] = useState({
-    timezone: "UTC-5",
-    language: "en",
-    theme: "light",
-    autoAnalysis: true,
-  })
+  // Update profile when user changes
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user.name || "",
+        email: user.email || "",
+        company: "",
+        role: user.role || "",
+        bio: "",
+      })
+    }
+  }, [user])
 
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -198,15 +197,6 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveNotifications = () => {
-    // Save notifications logic here
-    console.log("Notifications saved:", notifications)
-  }
-
-  const handleSavePreferences = () => {
-    // Save preferences logic here
-    console.log("Preferences saved:", preferences)
-  }
 
   const handleAddUser = async () => {
     if (!isAdmin) {
@@ -365,9 +355,8 @@ export default function SettingsPage() {
         <p className="mt-1 text-sm text-gray-500">Manage your account settings and platform preferences.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="space-y-6">
         {/* Profile Settings */}
-        <div className="lg:col-span-2 space-y-6">
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -380,7 +369,9 @@ export default function SettingsPage() {
               <div className="flex items-center space-x-4">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src="/placeholder-user.jpg" />
-                  <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">JD</AvatarFallback>
+                  <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
+                    {user?.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
                   <Button variant="outline" size="sm">
@@ -423,6 +414,7 @@ export default function SettingsPage() {
                     id="role"
                     value={profile.role || ""}
                     onChange={(e) => setProfile({ ...profile, role: e.target.value })}
+                    disabled
                   />
                 </div>
               </div>
@@ -458,186 +450,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Notification Settings */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Bell className="mr-2 h-5 w-5 text-blue-600" />
-                Notification Preferences
-              </CardTitle>
-              <CardDescription>Choose how you want to be notified about updates and activities.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Email Alerts</Label>
-                    <p className="text-sm text-gray-500">Receive email notifications for important updates</p>
-                  </div>
-                  <Switch
-                    checked={notifications.emailAlerts}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, emailAlerts: checked })}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Push Notifications</Label>
-                    <p className="text-sm text-gray-500">Get push notifications in your browser</p>
-                  </div>
-                  <Switch
-                    checked={notifications.pushNotifications}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, pushNotifications: checked })}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Weekly Reports</Label>
-                    <p className="text-sm text-gray-500">Receive weekly summary reports via email</p>
-                  </div>
-                  <Switch
-                    checked={notifications.weeklyReports}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, weeklyReports: checked })}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">System Updates</Label>
-                    <p className="text-sm text-gray-500">Get notified about system maintenance and updates</p>
-                  </div>
-                  <Switch
-                    checked={notifications.systemUpdates}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, systemUpdates: checked })}
-                  />
-                </div>
-              </div>
-
-              <Button onClick={handleSaveNotifications} className="bg-blue-600 hover:bg-blue-700">
-                <Save className="mr-2 h-4 w-4" />
-                Save Notifications
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Platform Preferences */}
-        <div className="space-y-6">
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Database className="mr-2 h-5 w-5 text-blue-600" />
-                Platform Preferences
-              </CardTitle>
-              <CardDescription>Customize your platform experience and analysis settings.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="timezone">Timezone</Label>
-                <Select
-                  value={preferences.timezone || "UTC-5"}
-                  onValueChange={(value) => setPreferences({ ...preferences, timezone: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UTC-8">Pacific Time (UTC-8)</SelectItem>
-                    <SelectItem value="UTC-7">Mountain Time (UTC-7)</SelectItem>
-                    <SelectItem value="UTC-6">Central Time (UTC-6)</SelectItem>
-                    <SelectItem value="UTC-5">Eastern Time (UTC-5)</SelectItem>
-                    <SelectItem value="UTC+0">UTC</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="language">Language</Label>
-                <Select
-                  value={preferences.language || "en"}
-                  onValueChange={(value) => setPreferences({ ...preferences, language: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="theme">Theme</Label>
-                <Select
-                  value={preferences.theme || "light"}
-                  onValueChange={(value) => setPreferences({ ...preferences, theme: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-sm font-medium">Auto Analysis</Label>
-                  <p className="text-xs text-gray-500">Automatically analyze new leads</p>
-                </div>
-                <Switch
-                  checked={preferences.autoAnalysis}
-                  onCheckedChange={(checked) => setPreferences({ ...preferences, autoAnalysis: checked })}
-                />
-              </div>
-
-              <Button onClick={handleSavePreferences} className="w-full bg-blue-600 hover:bg-blue-700">
-                <Save className="mr-2 h-4 w-4" />
-                Save Preferences
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Security Settings */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="mr-2 h-5 w-5 text-blue-600" />
-                Security
-              </CardTitle>
-              <CardDescription>Manage your account security settings.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button variant="outline" className="w-full bg-transparent">
-                Change Password
-              </Button>
-              <Button variant="outline" className="w-full bg-transparent">
-                Enable Two-Factor Auth
-              </Button>
-              <Button variant="outline" className="w-full bg-transparent">
-                Download Data
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* User Management */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="space-y-6">
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center">
