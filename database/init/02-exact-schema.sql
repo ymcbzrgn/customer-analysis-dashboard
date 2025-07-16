@@ -123,12 +123,12 @@ ADD CONSTRAINT email_customer_id_fkey
 FOREIGN KEY (customer_id) REFERENCES customers(id);
 
 -- Insert sample users for testing
--- Note: Using pgcrypto for password hashing
+-- Note: Using bcrypt for password hashing
 INSERT INTO users (email, password_hash, name, role, permissions, is_active) 
 VALUES 
 (
     'admin@example.com',
-    crypt('admin123', gen_salt('bf')),
+    '$2b$10$QPt.nvD6oGDDYyFneG4Um.7uQtLREvggU4sceeIk4iR0H5QftBQ/S', -- password: admin123
     'Admin User',
     'admin',
     ARRAY['users.read', 'users.write', 'users.delete', 'customers.read', 'customers.write', 'customers.delete', 'analytics.read', 'settings.write'],
@@ -136,10 +136,27 @@ VALUES
 ),
 (
     'user@example.com',
-    crypt('user123', gen_salt('bf')),
+    '$2b$10$0mXDSpueEjG1CxyL5eQD2uUn0gHvNvzFNBjIkSsHkofOpa1aXYqjW', -- password: user123
     'Regular User',
     'user',
     ARRAY['customers.read', 'analytics.read'],
     true
-)
-ON CONFLICT (email) DO NOTHING;
+);
+
+-- Insert sample data to support charts
+INSERT INTO industries (id, industry) VALUES 
+(1, 'Technology'), 
+(2, 'Manufacturing'), 
+(3, 'Healthcare'), 
+(4, 'Finance');
+
+INSERT INTO customers (id, name, website, contact_email, created_at, updated_at) VALUES 
+(1, 'Acme Corp', 'acme.com', 'info@acme.com', NOW(), NOW()), 
+(2, 'Tech Solutions', 'techsol.com', 'contact@techsol.com', NOW(), NOW()), 
+(3, 'Global Industries', 'global.com', 'hello@global.com', NOW(), NOW());
+
+INSERT INTO customer_status (id, customer_id, status, comment, updated_at) VALUES 
+(1, 1, 'Active', 'Sample customer', NOW()), 
+(2, 2, 'Pending', 'New lead', NOW()), 
+(3, 3, 'Inactive', 'Old customer', NOW()), 
+(4, 1, 'Active', 'Another active', NOW());

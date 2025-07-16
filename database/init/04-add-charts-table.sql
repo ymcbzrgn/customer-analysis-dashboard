@@ -61,28 +61,127 @@ CREATE TRIGGER charts_updated_at_trigger
     FOR EACH ROW
     EXECUTE FUNCTION update_charts_updated_at();
 
--- Insert sample chart data for testing (minimal examples only)
--- Use admin user ID (first user)
+-- Insert 2 sample node-based charts for testing
 INSERT INTO charts (name, description, config, source_table_name, chart_type, is_public, created_by) 
 SELECT 
-    'Customer Status Distribution',
-    'Shows distribution of customer statuses',
+    'Company Organization Chart',
+    'Shows company organizational structure',
     '{
-        "type": "bar",
-        "data": {
-            "source": "customers",
-            "groupBy": "status",
-            "aggregation": "count"
-        },
-        "display": {
-            "title": "Customer Status Distribution",
-            "xAxis": "Status",
-            "yAxis": "Count",
-            "colors": ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]
-        }
+        "nodes": [
+            {
+                "id": "1",
+                "type": "employee",
+                "position": {"x": 250, "y": 50},
+                "data": {
+                    "label": "CEO",
+                    "sublabel": "Chief Executive Officer",
+                    "department": "Executive",
+                    "level": 1,
+                    "email": "ceo@company.com"
+                }
+            },
+            {
+                "id": "2",
+                "type": "employee",
+                "position": {"x": 100, "y": 200},
+                "data": {
+                    "label": "CTO",
+                    "sublabel": "Chief Technology Officer",
+                    "department": "Technology",
+                    "level": 2,
+                    "email": "cto@company.com"
+                }
+            },
+            {
+                "id": "3",
+                "type": "employee",
+                "position": {"x": 400, "y": 200},
+                "data": {
+                    "label": "CFO",
+                    "sublabel": "Chief Financial Officer",
+                    "department": "Finance",
+                    "level": 2,
+                    "email": "cfo@company.com"
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1-2", "source": "1", "target": "2"},
+            {"id": "e1-3", "source": "1", "target": "3"}
+        ]
     }',
-    'customers',
-    'bar',
+    null,
+    'organizational',
+    true,
+    u.id
+FROM users u
+WHERE u.email = 'admin@example.com'
+LIMIT 1;
+
+INSERT INTO charts (name, description, config, source_table_name, chart_type, is_public, created_by) 
+SELECT 
+    'Sales Process Flow',
+    'Shows sales team workflow process',
+    '{
+        "nodes": [
+            {
+                "id": "1",
+                "type": "employee",
+                "position": {"x": 250, "y": 50},
+                "data": {
+                    "label": "Sales Manager",
+                    "sublabel": "Team Lead",
+                    "department": "Sales",
+                    "level": 3,
+                    "email": "sales-manager@company.com"
+                }
+            },
+            {
+                "id": "2",
+                "type": "employee",
+                "position": {"x": 100, "y": 200},
+                "data": {
+                    "label": "Sales Rep A",
+                    "sublabel": "Senior Sales",
+                    "department": "Sales",
+                    "level": 4,
+                    "email": "sales-a@company.com"
+                }
+            },
+            {
+                "id": "3",
+                "type": "employee",
+                "position": {"x": 400, "y": 200},
+                "data": {
+                    "label": "Sales Rep B",
+                    "sublabel": "Junior Sales",
+                    "department": "Sales",
+                    "level": 5,
+                    "email": "sales-b@company.com"
+                }
+            },
+            {
+                "id": "4",
+                "type": "employee",
+                "position": {"x": 250, "y": 350},
+                "data": {
+                    "label": "Support Lead",
+                    "sublabel": "Customer Support",
+                    "department": "Operations",
+                    "level": 3,
+                    "email": "support@company.com"
+                }
+            }
+        ],
+        "edges": [
+            {"id": "e1-2", "source": "1", "target": "2"},
+            {"id": "e1-3", "source": "1", "target": "3"},
+            {"id": "e2-4", "source": "2", "target": "4"},
+            {"id": "e3-4", "source": "3", "target": "4"}
+        ]
+    }',
+    null,
+    'flow',
     true,
     u.id
 FROM users u

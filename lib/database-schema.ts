@@ -92,6 +92,7 @@ class DatabaseSchemaManager {
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE c.relname = $1
         AND n.nspname = 'public'
+        AND d.objsubid = 0
     `, [tableName]);
 
     return result.rows[0]?.description === 'system_table';
@@ -116,7 +117,7 @@ class DatabaseSchemaManager {
         FROM pg_class c 
         JOIN pg_namespace n ON n.oid = c.relnamespace 
         WHERE c.relname = t.table_name AND n.nspname = 'public'
-      )
+      ) AND d.objsubid = 0
       WHERE t.table_schema = 'public'
         AND t.table_type = 'BASE TABLE'
       ORDER BY t.table_name

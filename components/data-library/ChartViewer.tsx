@@ -409,11 +409,15 @@ export function ChartViewer({ open, onClose, chart, onEdit }: ChartViewerProps) 
                   {isVisualChart ? (
                     <>
                       <div className="flex justify-between">
-                        <span className="font-medium">Nodes:</span>
+                        <span className="font-medium">
+                          {chart?.chart_type === 'organizational' ? 'Employees:' : 'Nodes:'}
+                        </span>
                         <span>{chart.node_count || 0}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-medium">Connections:</span>
+                        <span className="font-medium">
+                          {chart?.chart_type === 'organizational' ? 'Connections:' : 'Edges:'}
+                        </span>
                         <span>{chart.edge_count || 0}</span>
                       </div>
                     </>

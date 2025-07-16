@@ -77,6 +77,9 @@ export default function ChartEditor({ open, onClose, onSave, chart, mode = 'crea
   const [chartDescription, setChartDescription] = useState(chart?.description || '')
   const [isPublic, setIsPublic] = useState(chart?.is_public || false)
   
+  // Check if this is a visual chart (organizational/flow) vs data chart (bar/pie/line)
+  const isVisualChart = chart?.chart_type === 'organizational' || chart?.chart_type === 'flow' || false
+  
   // Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState(chart?.config?.nodes || [])
   const [edges, setEdges, onEdgesChange] = useEdgesState(chart?.config?.edges || [])
@@ -409,7 +412,8 @@ export default function ChartEditor({ open, onClose, onSave, chart, mode = 'crea
                   </CardContent>
                 </Card>
 
-                {/* Actions */}
+                {/* Actions - Only for visual charts */}
+                {isVisualChart && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -456,6 +460,7 @@ export default function ChartEditor({ open, onClose, onSave, chart, mode = 'crea
                     )}
                   </CardContent>
                 </Card>
+                )}
 
                 {/* Chart Stats */}
                 <Card>
@@ -469,11 +474,17 @@ export default function ChartEditor({ open, onClose, onSave, chart, mode = 'crea
                     <div className="grid grid-cols-2 gap-4 text-center">
                       <div>
                         <div className="text-2xl font-bold text-blue-600">{nodes.length}</div>
-                        <div className="text-xs text-gray-600">Employees</div>
+                        <div className="text-xs text-gray-600">
+                          {chart?.chart_type === 'organizational' ? 'Employees' : 
+                           chart?.chart_type === 'flow' ? 'Nodes' : 'Data Points'}
+                        </div>
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-green-600">{edges.length}</div>
-                        <div className="text-xs text-gray-600">Connections</div>
+                        <div className="text-xs text-gray-600">
+                          {chart?.chart_type === 'organizational' ? 'Connections' : 
+                           chart?.chart_type === 'flow' ? 'Edges' : 'Series'}
+                        </div>
                       </div>
                     </div>
                   </CardContent>

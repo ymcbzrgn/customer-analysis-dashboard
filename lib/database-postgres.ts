@@ -669,13 +669,26 @@ class PostgreSQLDatabase {
         const aggregationCol = config.data.valueColumn || 'id'
         const aggregationFunc = config.data.aggregation.toUpperCase()
         
+        // Check if the groupBy column actually exists in the table
+        const columnCheckResult = await this.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = $1 AND column_name = $2 AND table_schema = 'public'
+        `, [tableName, config.data.groupBy])
+        
+        if (columnCheckResult.rows.length === 0) {
+          // Column doesn't exist, return empty data
+          console.warn(`Column ${config.data.groupBy} does not exist in table ${tableName}`)
+          return []
+        }
+        
         query += `${config.data.groupBy} as name, ${aggregationFunc}(${aggregationCol}) as value`
         query += ` FROM ${tableName}`
         
-        // Add joins if needed
-        if (config.data.joinTable) {
-          query += ` LEFT JOIN ${config.data.joinTable} ON ${tableName}.${config.data.groupBy}_id = ${config.data.joinTable}.id`
-        }
+        // Skip joins for now - they require proper foreign key relationships
+        // if (config.data.joinTable) {
+        //   query += ` LEFT JOIN ${config.data.joinTable} ON ${tableName}.${config.data.groupBy}_id = ${config.data.joinTable}.id`
+        // }
         
         query += ` GROUP BY ${config.data.groupBy}`
         query += ` ORDER BY ${config.data.groupBy}`

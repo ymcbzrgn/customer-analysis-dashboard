@@ -27,7 +27,15 @@
       "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT id, name, chart_type, config FROM charts WHERE name LIKE ''%Company%'' OR name LIKE ''%Organizational%'';\")",
       "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -f update-org-chart.sql)",
       "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT name, chart_type, jsonb_pretty(config) FROM charts WHERE name = ''Company Organizational Chart'';\")",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Bash(kill:*)",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT table_name FROM information_schema.tables WHERE table_schema=''public'' AND table_name=''charts'';\")",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT COUNT(*) FROM charts;\")",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT id, name, description, chart_type, is_public FROM charts ORDER BY created_at DESC;\")",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT id, name, chart_type, config FROM charts WHERE id = ''487ad111-79a6-4e56-96a0-c52aea6d9859'';\")",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT id, name, chart_type, config FROM charts WHERE chart_type = ''organizational'' LIMIT 1;\")",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT COUNT(*) FROM charts WHERE chart_type = ''organizational'';\")",
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT COUNT(*) FROM charts WHERE chart_type = ''flow'';\")"
     ],
     "deny": []
   }
