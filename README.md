@@ -110,6 +110,53 @@ sudo apt install docker-compose
 docker-compose --version
 ```
 
+### ❌ "ENOENT: no such file or directory, uv_cwd" Hatası
+
+**Sorun**: npm komutları çalışmıyor, dizin bulunamıyor
+
+**Çözüm 1: Dizin Kontrolü ve Düzeltme**
+```bash
+# Mevcut dizini kontrol edin
+pwd
+ls -la
+
+# Eğer dizin yoksa, doğru dizine gidin
+cd /mnt/c/Users/[KULLANICI_ADI]/Desktop
+ls -la customer-analysis-dashboard
+
+# Dizine girin
+cd customer-analysis-dashboard
+
+# npm komutunu tekrar deneyin
+npm install --legacy-peer-deps
+```
+
+**Çözüm 2: WSL2 Yeniden Başlatma**
+```bash
+# WSL2'yi tamamen kapatın
+exit
+wsl --shutdown
+
+# WSL2'yi yeniden başlatın
+wsl
+
+# Doğru dizine gidin
+cd /mnt/c/Users/[KULLANICI_ADI]/Desktop/customer-analysis-dashboard
+npm install --legacy-peer-deps
+```
+
+**Çözüm 3: Node.js Sorunları**
+```bash
+# Node.js cache temizleme
+npm cache clean --force
+
+# Global npm güncelleme
+npm install -g npm@latest
+
+# Tekrar deneyin
+npm install --legacy-peer-deps
+```
+
 ### ❌ Docker Daemon Hatası
 
 **Sorun**: Cannot connect to Docker daemon
@@ -221,8 +268,20 @@ wsl --shutdown
 # 4. Yeniden dene
 wsl
 cd /mnt/c/Users/[KULLANICI_ADI]/Desktop/customer-analysis-dashboard
+
+# 5. Dizin kontrolü
+pwd
+ls -la package.json
+
+# 6. npm sorunları için
+npm cache clean --force
+npm install -g npm@latest
+
+# 7. Çalıştırma
 docker-compose --version
 npm run db:start
+npm install --legacy-peer-deps
+npm run dev
 ```
 
 ---
