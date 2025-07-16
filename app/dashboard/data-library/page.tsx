@@ -157,6 +157,7 @@ export default function DataLibraryPage() {
   }
 
   const handleViewData = (tableName: string, isSystemTable: boolean) => {
+    console.log('handleViewData:', { tableName, isSystemTable })
     setSelectedTable(tableName)
     setSelectedTableIsSystem(isSystemTable)
     setShowDataModal(true)

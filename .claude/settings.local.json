@@ -26,7 +26,8 @@
       "Bash(npx tsc:*)",
       "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT id, name, chart_type, config FROM charts WHERE name LIKE ''%Company%'' OR name LIKE ''%Organizational%'';\")",
       "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -f update-org-chart.sql)",
-      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT name, chart_type, jsonb_pretty(config) FROM charts WHERE name = ''Company Organizational Chart'';\")"
+      "Bash(PGPASSWORD=postgres_password_2024 psql -h localhost -p 5432 -U postgres -d customer_analysis_db -c \"SELECT name, chart_type, jsonb_pretty(config) FROM charts WHERE name = ''Company Organizational Chart'';\")",
+      "Bash(docker-compose:*)"
     ],
     "deny": []
   }

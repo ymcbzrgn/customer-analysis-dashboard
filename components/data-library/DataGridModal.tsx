@@ -68,6 +68,7 @@ interface TableSchema {
 }
 
 export default function DataGridModal({ open, onClose, tableName, isSystemTable = false }: DataGridModalProps) {
+  console.log('DataGridModal render:', { tableName, isSystemTable })
   const [schema, setSchema] = useState<TableSchema | null>(null)
   const [data, setData] = useState<TableData[]>([])
   const [loading, setLoading] = useState(false)
