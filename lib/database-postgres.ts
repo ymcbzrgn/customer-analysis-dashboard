@@ -283,6 +283,70 @@ class PostgreSQLDatabase {
     }
   }
 
+  // Industries operations
+  async getIndustriesWithCustomerCounts(): Promise<any[]> {
+    const result = await this.query(`
+      SELECT 
+        i.id,
+        i.industry as name,
+        COALESCE(COUNT(DISTINCT cc.customer_id), 0) as customer_count
+      FROM industries i
+      LEFT JOIN dorks d ON i.id = d.industry_id  
+      LEFT JOIN customer_classifications cc ON d.id = cc.dork_id
+      GROUP BY i.id, i.industry
+      ORDER BY i.industry
+    `)
+    
+    // Fallback: If dorks table is empty, return industries with 0 count
+    if (result.rows.length === 0) {
+      const fallbackResult = await this.query(`
+        SELECT 
+          i.id,
+          i.industry as name,
+          0 as customer_count
+        FROM industries i
+        ORDER BY i.industry
+      `)
+      return fallbackResult.rows
+    }
+    
+    return result.rows
+  }
+
+  async createIndustry(name: string): Promise<any> {
+    // Get next available ID
+    const maxIdResult = await this.query(`
+      SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM industries
+    `)
+    const nextId = maxIdResult.rows[0].next_id
+    
+    const result = await this.query(`
+      INSERT INTO industries (id, industry)
+      VALUES ($1, $2)
+      RETURNING id, industry as name
+    `, [nextId, name])
+    return result.rows[0]
+  }
+
+  async updateIndustry(id: string, name: string): Promise<any> {
+    const result = await this.query(`
+      UPDATE industries 
+      SET industry = $1
+      WHERE id = $2
+      RETURNING id, industry as name
+    `, [name, id])
+    return result.rows[0]
+  }
+
+
+  async getTotalCustomerCount(): Promise<number> {
+    const result = await this.query(`
+      SELECT COUNT(*) as total_customers
+      FROM customers
+    `)
+    return parseInt(result.rows[0].total_customers) || 0
+  }
+
   // Customer operations - uses real classification data when available
   // NOTE: customer_classifications table is currently empty, so compatibility_score will be NULL
   // Industry classification uses smart name-based detection as fallback
