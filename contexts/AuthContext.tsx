@@ -16,12 +16,14 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>
   logout: () => void
   isLoading: boolean
+  token: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
@@ -29,10 +31,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check for existing session on mount
     const initializeAuth = async () => {
       const savedUser = localStorage.getItem('user')
-      const sessionToken = localStorage.getItem('sessionToken')
+      const savedToken = localStorage.getItem('authToken')
       const sessionExpiry = localStorage.getItem('sessionExpiry')
       
-      if (savedUser && sessionToken && sessionExpiry) {
+      if (savedUser && savedToken && sessionExpiry) {
         // Check if session is still valid
         if (new Date() < new Date(sessionExpiry)) {
           try {
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const result = await dbClient.verifyUser(user.id)
             if (result.success && result.user) {
               setUser(user)
+              setToken(savedToken)
             } else {
               // User doesn't exist or is inactive
               clearSession()
@@ -63,9 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearSession = () => {
     localStorage.removeItem('user')
-    localStorage.removeItem('sessionToken')
+    localStorage.removeItem('authToken')
     localStorage.removeItem('sessionExpiry')
     setUser(null)
+    setToken(null)
   }
 
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
@@ -85,16 +89,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: result.user.role
       }
 
-      // Generate session token and expiry (24 hours from now)
-      const sessionToken = btoa(`${result.user.id}-${Date.now()}-${Math.random()}`)
+      // Get the JWT token from the response
+      const authToken = (result as any).token || ''
       const sessionExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
       // Store in localStorage (in real app, use secure httpOnly cookies)
       localStorage.setItem('user', JSON.stringify(userSession))
-      localStorage.setItem('sessionToken', sessionToken)
+      localStorage.setItem('authToken', authToken)
       localStorage.setItem('sessionExpiry', sessionExpiry)
 
       setUser(userSession)
+      setToken(authToken)
       
       return { success: true, message: 'Login successful' }
     } catch (error) {
@@ -109,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading, token }}>
       {children}
     </AuthContext.Provider>
   )
