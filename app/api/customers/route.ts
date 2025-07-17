@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         c.updated_at,
         COALESCE(latest_status.status, 'pending') as status,
         latest_status.comment as notes,
+        latest_status.comment as comment,
         cc.compatibility_score,
         cc.description,
         d.country_code,

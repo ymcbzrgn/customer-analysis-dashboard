@@ -59,6 +59,7 @@ interface Customer {
   createdDate: string
   status: "pending" | "approved" | "rejected"
   notes: string
+  comment?: string
   description?: string
 }
 
@@ -124,6 +125,7 @@ export default function CustomersPage() {
           createdDate: customer.created_at || customer.updated_at || new Date().toISOString(),
           status: customer.status || "pending" as const,
           notes: customer.notes || '',
+          comment: customer.comment || '',
           description: customer.description || '',
         }))
         setCustomers(transformedCustomers)
@@ -663,42 +665,6 @@ export default function CustomersPage() {
                           >
                             <X className="h-3 w-3" />
                           </Button>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-blue-600 border-blue-200 hover:bg-blue-50 bg-transparent"
-                                onClick={() => {
-                                  setSelectedCustomer(customer)
-                                  setComment(customer.notes)
-                                }}
-                              >
-                                <MessageSquare className="h-3 w-3" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Add Comment</DialogTitle>
-                                <DialogDescription>Add or update notes for {customer.name}</DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <Textarea
-                                  placeholder="Enter your comments..."
-                                  value={comment}
-                                  onChange={(e) => setComment(e.target.value)}
-                                  rows={4}
-                                />
-                              </div>
-                              <DialogFooter>
-                                <Button
-                                  onClick={() => selectedCustomer && handleAddComment(selectedCustomer.id, comment)}
-                                >
-                                  Save Comment
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1009,21 +975,35 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              {/* Notes */}
+              {/* Comment */}
+              <div>
+                <Label className="text-sm font-medium text-gray-600">Comment</Label>
+                {selectedCustomerDetail.comment ? (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-700">{selectedCustomerDetail.comment}</p>
+                  </div>
+                ) : (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 italic">No comment available</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Mail */}
               <div>
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                  <Label className="text-sm font-medium text-gray-600">Mail</Label>
                   {!isEditingComment && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
                         setIsEditingComment(true)
-                        setDetailModalComment(selectedCustomerDetail?.notes || '')
+                        setDetailModalComment('')
                       }}
                     >
                       <MessageSquare className="h-3 w-3 mr-1" />
-                      {selectedCustomerDetail.notes ? 'Edit' : 'Add'} Note
+                      Add Mail
                     </Button>
                   )}
                 </div>
@@ -1031,7 +1011,7 @@ export default function CustomersPage() {
                 {isEditingComment ? (
                   <div className="mt-2 space-y-3">
                     <Textarea
-                      placeholder="Enter your notes..."
+                      placeholder="Enter mail information..."
                       value={detailModalComment || ""}
                       onChange={(e) => setDetailModalComment(e.target.value)}
                       rows={4}
@@ -1046,7 +1026,7 @@ export default function CustomersPage() {
                           }
                         }}
                       >
-                        Save Note
+                        Save Mail
                       </Button>
                       <Button
                         variant="outline"
@@ -1060,13 +1040,9 @@ export default function CustomersPage() {
                       </Button>
                     </div>
                   </div>
-                ) : selectedCustomerDetail.notes ? (
-                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-700">{selectedCustomerDetail.notes}</p>
-                  </div>
                 ) : (
                   <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500 italic">No notes added yet</p>
+                    <p className="text-sm text-gray-500 italic">No mail information added yet</p>
                   </div>
                 )}
               </div>
