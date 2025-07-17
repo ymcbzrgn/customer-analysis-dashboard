@@ -115,6 +115,10 @@ ALTER TABLE customer_status
 ADD CONSTRAINT customer_status_customer_id_fkey 
 FOREIGN KEY (customer_id) REFERENCES customers(id);
 
+ALTER TABLE customer_status 
+ADD CONSTRAINT customer_status_user_id_fkey 
+FOREIGN KEY (user_id) REFERENCES users(id);
+
 ALTER TABLE dorks 
 ADD CONSTRAINT dorks_industry_id_fkey 
 FOREIGN KEY (industry_id) REFERENCES industries(id);
@@ -156,7 +160,7 @@ INSERT INTO customers (id, name, website, contact_email, created_at, updated_at)
 (2, 'Tech Solutions', 'techsol.com', 'contact@techsol.com', NOW(), NOW()), 
 (3, 'Global Industries', 'global.com', 'hello@global.com', NOW(), NOW());
 
-INSERT INTO customer_status (customer_id, status, comment, updated_at) VALUES 
-(1, 'approved', 'Customer approved for collaboration', NOW()), 
-(2, 'rejected', 'Not compatible with our products', NOW()), 
-(3, 'approved', 'Good fit for our services', NOW());
+INSERT INTO customer_status (customer_id, status, comment, updated_at, user_id) VALUES 
+(1, 'approved', 'Customer approved for collaboration', NOW(), 1), 
+(2, 'rejected', 'Not compatible with our products', NOW(), 1), 
+(3, 'approved', 'Good fit for our services', NOW(), 2);

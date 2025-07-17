@@ -333,13 +333,13 @@ class PostgreSQLDatabase {
   }
 
   // Add method to update customer status (for approve/reject)
-  async updateCustomerStatus(customerId: string, status: string, comment?: string): Promise<boolean> {
+  async updateCustomerStatus(customerId: string, status: string, comment?: string, userId?: string): Promise<boolean> {
     try {
       // Always insert new status record to maintain history
       const result = await this.query(`
-        INSERT INTO customer_status (customer_id, status, comment, updated_at)
-        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-      `, [customerId, status, comment || ''])
+        INSERT INTO customer_status (customer_id, status, comment, updated_at, user_id)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4)
+      `, [customerId, status, comment || '', userId])
       return result.rowCount > 0
     } catch (error) {
       console.error('Failed to update customer status:', error)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dbPostgres } from '@/lib/database-postgres'
+import { verifyJWT, extractTokenFromHeader } from '@/lib/auth'
 
 export async function PUT(
   request: NextRequest,
@@ -31,8 +32,32 @@ export async function PUT(
       )
     }
 
-    // Update customer status in PostgreSQL
-    const success = await dbPostgres.updateCustomerStatus(id, status, comment)
+    // Extract user ID from token (either from Authorization header or cookie)
+    const authHeader = request.headers.get('Authorization')
+    let token = extractTokenFromHeader(authHeader)
+    
+    // If no token in header, check cookies
+    if (!token) {
+      token = request.cookies.get('auth-token')?.value
+    }
+    
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: 'Authentication token is required' },
+        { status: 401 }
+      )
+    }
+
+    const payload = verifyJWT(token)
+    if (!payload) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid or expired token' },
+        { status: 401 }
+      )
+    }
+
+    // Update customer status in PostgreSQL with user ID
+    const success = await dbPostgres.updateCustomerStatus(id, status, comment, payload.userId)
     
     if (!success) {
       return NextResponse.json(
