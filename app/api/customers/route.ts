@@ -9,9 +9,38 @@ export async function GET(request: NextRequest) {
     // For now, return all customers regardless of user (temporary fix)
     // TODO: Add user_id column to customers table for proper user association
     const customers = await dbPostgres.query(`
-      SELECT id, name, website, contact_email, facebook, twitter, linkedin, instagram, created_at, updated_at
-      FROM customers
-      ORDER BY created_at DESC
+      SELECT 
+        c.id, 
+        c.name, 
+        c.website, 
+        c.contact_email, 
+        c.facebook, 
+        c.twitter, 
+        c.linkedin, 
+        c.instagram, 
+        c.created_at, 
+        c.updated_at,
+        COALESCE(latest_status.status, 'pending') as status,
+        latest_status.comment as notes,
+        latest_status.comment as comment,
+        cc.compatibility_score,
+        cc.description,
+        d.country_code,
+        i.industry
+      FROM customers c
+      LEFT JOIN (
+        SELECT DISTINCT ON (customer_id) 
+          customer_id, 
+          status, 
+          comment, 
+          updated_at
+        FROM customer_status
+        ORDER BY customer_id, updated_at DESC
+      ) latest_status ON c.id = latest_status.customer_id
+      LEFT JOIN customer_classifications cc ON c.id = cc.customer_id
+      LEFT JOIN dorks d ON cc.dork_id = d.id
+      LEFT JOIN industries i ON d.industry_id = i.id
+      ORDER BY c.created_at DESC
     `)
     
     return NextResponse.json({ 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,12 @@ import {
   Twitter,
   Facebook,
   Instagram,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react"
 
 interface Customer {
@@ -52,10 +59,12 @@ interface Customer {
   createdDate: string
   status: "pending" | "approved" | "rejected"
   notes: string
+  comment?: string
   description?: string
 }
 
 export default function CustomersPage() {
+  const { token } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +77,20 @@ export default function CustomersPage() {
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<Customer | null>(null)
   const [detailModalComment, setDetailModalComment] = useState("")
   const [isEditingComment, setIsEditingComment] = useState(false)
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [recordsPerPage] = useState(10)
+  
+  // Sorting states
+  const [sortColumn, setSortColumn] = useState<keyof Customer | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [approveModalOpen, setApproveModalOpen] = useState(false)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [selectedCustomerForAction, setSelectedCustomerForAction] = useState<Customer | null>(null)
+  const [approveComment, setApproveComment] = useState("")
+  const [rejectComment, setRejectComment] = useState("")
+  const [rejectCommentError, setRejectCommentError] = useState("")
 
   // Load customers from API on component mount
   useEffect(() => {
@@ -102,6 +125,7 @@ export default function CustomersPage() {
           createdDate: customer.created_at || customer.updated_at || new Date().toISOString(),
           status: customer.status || "pending" as const,
           notes: customer.notes || '',
+          comment: customer.comment || '',
           description: customer.description || '',
         }))
         setCustomers(transformedCustomers)
@@ -116,31 +140,89 @@ export default function CustomersPage() {
     }
   }
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesIndustry = industryFilter === "all" || customer.industry === industryFilter
-    const matchesStatus = statusFilter === "all" || customer.status === statusFilter
-    const matchesScore =
-      scoreRange === "all" ||
-      (scoreRange === "high" && customer.score >= 80) ||
-      (scoreRange === "medium" && customer.score >= 50 && customer.score < 80) ||
-      (scoreRange === "low" && customer.score < 50)
+  const handleSort = (column: keyof Customer) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
 
-    return matchesSearch && matchesIndustry && matchesStatus && matchesScore
-  })
+  const getSortIcon = (column: keyof Customer) => {
+    if (sortColumn !== column) {
+      return <ChevronUp className="h-4 w-4 text-gray-400" />
+    }
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="h-4 w-4 text-gray-600" /> : 
+      <ChevronDown className="h-4 w-4 text-gray-600" />
+  }
 
-  const handleStatusChange = async (customerId: string, newStatus: "approved" | "rejected") => {
+  const sortedAndFilteredCustomers = customers
+    .filter((customer) => {
+      const matchesSearch =
+        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.email.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesIndustry = industryFilter === "all" || customer.industry === industryFilter
+      const matchesStatus = statusFilter === "all" || customer.status === statusFilter
+      const matchesScore =
+        scoreRange === "all" ||
+        (scoreRange === "high" && customer.score >= 80) ||
+        (scoreRange === "medium" && customer.score >= 50 && customer.score < 80) ||
+        (scoreRange === "low" && customer.score < 50)
+
+      return matchesSearch && matchesIndustry && matchesStatus && matchesScore
+    })
+    .sort((a, b) => {
+      if (!sortColumn) return 0
+      
+      let aValue = a[sortColumn]
+      let bValue = b[sortColumn]
+      
+      // Handle different data types for sorting
+      if (sortColumn === 'score') {
+        // Numeric sorting
+        aValue = Number(aValue)
+        bValue = Number(bValue)
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
+      } else if (sortColumn === 'createdDate') {
+        // Date sorting
+        aValue = new Date(aValue as string).getTime()
+        bValue = new Date(bValue as string).getTime()
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
+      } else {
+        // String sorting (alphabetical)
+        aValue = String(aValue).toLowerCase()
+        bValue = String(bValue).toLowerCase()
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      }
+    })
+
+  // Pagination calculations
+  const totalRecords = sortedAndFilteredCustomers.length
+  const totalPages = Math.ceil(totalRecords / recordsPerPage)
+  const startIndex = (currentPage - 1) * recordsPerPage
+  const endIndex = startIndex + recordsPerPage
+  const currentCustomers = sortedAndFilteredCustomers.slice(startIndex, endIndex)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, industryFilter, statusFilter, scoreRange])
+
+  const handleStatusChange = async (customerId: string, newStatus: "approved" | "rejected", comment?: string) => {
     try {
       const response = await fetch(`/api/customers/${customerId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ 
           status: newStatus,
-          comment: `Status changed to ${newStatus} by user`
+          comment: comment || `Status changed to ${newStatus} by user`
         }),
       })
       
@@ -161,6 +243,31 @@ export default function CustomersPage() {
     }
   }
 
+  const handleApprove = async () => {
+    if (!selectedCustomerForAction) return
+    
+    await handleStatusChange(selectedCustomerForAction.id, "approved", approveComment)
+    setApproveModalOpen(false)
+    setSelectedCustomerForAction(null)
+    setApproveComment("")
+  }
+
+  const handleReject = async () => {
+    if (!selectedCustomerForAction) return
+    
+    // Validate required comment
+    if (!rejectComment.trim()) {
+      setRejectCommentError("Comment is required for rejection")
+      return
+    }
+    
+    setRejectCommentError("")
+    await handleStatusChange(selectedCustomerForAction.id, "rejected", rejectComment)
+    setRejectModalOpen(false)
+    setSelectedCustomerForAction(null)
+    setRejectComment("")
+  }
+
   const handleAddComment = async (customerId: string, newComment: string) => {
     try {
       // Get current customer to preserve status
@@ -171,6 +278,7 @@ export default function CustomersPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ 
           status: currentStatus,
@@ -207,6 +315,7 @@ export default function CustomersPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ 
           status: currentStatus,
@@ -376,7 +485,9 @@ export default function CustomersPage() {
       {/* Customer Table */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Customer List ({filteredCustomers.length})</CardTitle>
+          <CardTitle className="text-lg font-semibold">
+            Customer List 
+          </CardTitle>
           <CardDescription>Detailed view of all customer leads and their analysis results</CardDescription>
         </CardHeader>
         <CardContent>
@@ -384,12 +495,60 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Industry</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-50 select-none"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Customer</span>
+                      {getSortIcon('name')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-50 select-none"
+                    onClick={() => handleSort('industry')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Industry</span>
+                      {getSortIcon('industry')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-50 select-none"
+                    onClick={() => handleSort('countryCode')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Location</span>
+                      {getSortIcon('countryCode')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-50 select-none"
+                    onClick={() => handleSort('score')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Score</span>
+                      {getSortIcon('score')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-50 select-none"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Status</span>
+                      {getSortIcon('status')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-gray-50 select-none"
+                    onClick={() => handleSort('createdDate')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Created</span>
+                      {getSortIcon('createdDate')}
+                    </div>
+                  </TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -412,14 +571,14 @@ export default function CustomersPage() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ) : filteredCustomers.length === 0 ? (
+                ) : sortedAndFilteredCustomers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="text-gray-500">No customers found</div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCustomers.map((customer) => (
+                  currentCustomers.map((customer) => (
                     <TableRow key={customer.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
@@ -486,7 +645,10 @@ export default function CustomersPage() {
                             size="sm"
                             variant="outline"
                             className="text-green-600 border-green-200 hover:bg-green-50 bg-transparent"
-                            onClick={() => handleStatusChange(customer.id, "approved")}
+                            onClick={() => {
+                              setSelectedCustomerForAction(customer)
+                              setApproveModalOpen(true)
+                            }}
                             disabled={customer.status === "approved"}
                           >
                             <Check className="h-3 w-3" />
@@ -495,47 +657,14 @@ export default function CustomersPage() {
                             size="sm"
                             variant="outline"
                             className="text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
-                            onClick={() => handleStatusChange(customer.id, "rejected")}
+                            onClick={() => {
+                              setSelectedCustomerForAction(customer)
+                              setRejectModalOpen(true)
+                            }}
                             disabled={customer.status === "rejected"}
                           >
                             <X className="h-3 w-3" />
                           </Button>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-blue-600 border-blue-200 hover:bg-blue-50 bg-transparent"
-                                onClick={() => {
-                                  setSelectedCustomer(customer)
-                                  setComment(customer.notes)
-                                }}
-                              >
-                                <MessageSquare className="h-3 w-3" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Add Comment</DialogTitle>
-                                <DialogDescription>Add or update notes for {customer.name}</DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <Textarea
-                                  placeholder="Enter your comments..."
-                                  value={comment}
-                                  onChange={(e) => setComment(e.target.value)}
-                                  rows={4}
-                                />
-                              </div>
-                              <DialogFooter>
-                                <Button
-                                  onClick={() => selectedCustomer && handleAddComment(selectedCustomer.id, comment)}
-                                >
-                                  Save Comment
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -544,8 +673,177 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination */}
+          {totalRecords > recordsPerPage && (
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, totalRecords)}</span> of <span className="font-medium">{totalRecords}</span> entries
+              </div>
+              <div className="flex items-center space-x-1">
+                {/* First page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                
+                {/* Previous page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                {/* Page numbers - show only first 5 pages */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map(page => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="min-w-[36px] px-3 py-1.5 text-sm"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  
+                  {/* Show ellipsis if there are more than 5 pages */}
+                  {totalPages > 5 && (
+                    <span className="px-2 py-1.5 text-sm text-gray-500">...</span>
+                  )}
+                  
+                  {/* Show last page number if it's not already shown */}
+                  {totalPages > 5 && (
+                    <Button
+                      variant={currentPage === totalPages ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="min-w-[36px] px-3 py-1.5 text-sm"
+                    >
+                      {totalPages}
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Next page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                
+                {/* Last page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+      
+      {/* Approve Modal */}
+      <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Customer</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to approve {selectedCustomerForAction?.name}?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="approve-comment">Comment (Optional)</Label>
+              <Textarea
+                id="approve-comment"
+                placeholder="Add an optional comment..."
+                value={approveComment}
+                onChange={(e) => setApproveComment(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setApproveModalOpen(false)
+              setSelectedCustomerForAction(null)
+              setApproveComment("")
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleApprove} className="bg-green-600 hover:bg-green-700">
+              <Check className="h-4 w-4 mr-2" />
+              Approve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Modal */}
+      <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Customer</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reject {selectedCustomerForAction?.name}?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="reject-comment">Comment (Required) <span className="text-red-500">*</span></Label>
+              <Textarea
+                id="reject-comment"
+                placeholder="Please provide a reason for rejection..."
+                value={rejectComment}
+                onChange={(e) => {
+                  setRejectComment(e.target.value)
+                  if (rejectCommentError) setRejectCommentError("")
+                }}
+                rows={3}
+                className={rejectCommentError ? "border-red-500" : ""}
+              />
+              {rejectCommentError && (
+                <p className="text-red-500 text-sm mt-1">{rejectCommentError}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setRejectModalOpen(false)
+              setSelectedCustomerForAction(null)
+              setRejectComment("")
+              setRejectCommentError("")
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleReject} className="bg-red-600 hover:bg-red-700">
+              <X className="h-4 w-4 mr-2" />
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* Customer Detail Dialog */}
       <Dialog open={!!selectedCustomerDetail} onOpenChange={() => {
         setSelectedCustomerDetail(null)
@@ -677,21 +975,35 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              {/* Notes */}
+              {/* Comment */}
+              <div>
+                <Label className="text-sm font-medium text-gray-600">Comment</Label>
+                {selectedCustomerDetail.comment ? (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-700">{selectedCustomerDetail.comment}</p>
+                  </div>
+                ) : (
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 italic">No comment available</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Mail */}
               <div>
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                  <Label className="text-sm font-medium text-gray-600">Mail</Label>
                   {!isEditingComment && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
                         setIsEditingComment(true)
-                        setDetailModalComment(selectedCustomerDetail?.notes || '')
+                        setDetailModalComment('')
                       }}
                     >
                       <MessageSquare className="h-3 w-3 mr-1" />
-                      {selectedCustomerDetail.notes ? 'Edit' : 'Add'} Note
+                      Add Mail
                     </Button>
                   )}
                 </div>
@@ -699,7 +1011,7 @@ export default function CustomersPage() {
                 {isEditingComment ? (
                   <div className="mt-2 space-y-3">
                     <Textarea
-                      placeholder="Enter your notes..."
+                      placeholder="Enter mail information..."
                       value={detailModalComment || ""}
                       onChange={(e) => setDetailModalComment(e.target.value)}
                       rows={4}
@@ -714,7 +1026,7 @@ export default function CustomersPage() {
                           }
                         }}
                       >
-                        Save Note
+                        Save Mail
                       </Button>
                       <Button
                         variant="outline"
@@ -728,13 +1040,9 @@ export default function CustomersPage() {
                       </Button>
                     </div>
                   </div>
-                ) : selectedCustomerDetail.notes ? (
-                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-700">{selectedCustomerDetail.notes}</p>
-                  </div>
                 ) : (
                   <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500 italic">No notes added yet</p>
+                    <p className="text-sm text-gray-500 italic">No mail information added yet</p>
                   </div>
                 )}
               </div>
