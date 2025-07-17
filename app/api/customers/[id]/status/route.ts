@@ -23,6 +23,14 @@ export async function PUT(
       )
     }
 
+    // Validate status values
+    if (!['approved', 'rejected'].includes(status)) {
+      return NextResponse.json(
+        { success: false, message: 'Status must be either "approved" or "rejected"' },
+        { status: 400 }
+      )
+    }
+
     // Update customer status in PostgreSQL
     const success = await dbPostgres.updateCustomerStatus(id, status, comment)
     

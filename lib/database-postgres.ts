@@ -335,27 +335,12 @@ class PostgreSQLDatabase {
   // Add method to update customer status (for approve/reject)
   async updateCustomerStatus(customerId: string, status: string, comment?: string): Promise<boolean> {
     try {
-      // First check if status exists for this customer
-      const existing = await this.query(`
-        SELECT id FROM customer_status WHERE customer_id = $1
-      `, [customerId])
-      
-      if (existing.rows.length > 0) {
-        // Update existing status
-        const result = await this.query(`
-          UPDATE customer_status 
-          SET status = $1, comment = $2, updated_at = CURRENT_TIMESTAMP
-          WHERE customer_id = $3
-        `, [status, comment || '', customerId])
-        return result.rowCount > 0
-      } else {
-        // Insert new status
-        const result = await this.query(`
-          INSERT INTO customer_status (customer_id, status, comment, updated_at)
-          VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-        `, [customerId, status, comment || ''])
-        return result.rowCount > 0
-      }
+      // Always insert new status record to maintain history
+      const result = await this.query(`
+        INSERT INTO customer_status (customer_id, status, comment, updated_at)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      `, [customerId, status, comment || ''])
+      return result.rowCount > 0
     } catch (error) {
       console.error('Failed to update customer status:', error)
       return false

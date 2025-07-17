@@ -58,11 +58,12 @@ CREATE TABLE customer_classifications (
 
 -- Create customer_status table
 CREATE TABLE customer_status (
-    id INTEGER PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('approved', 'rejected')),
     comment TEXT,
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    user_id INTEGER NOT NULL
 );
 
 -- Create email table
@@ -155,8 +156,7 @@ INSERT INTO customers (id, name, website, contact_email, created_at, updated_at)
 (2, 'Tech Solutions', 'techsol.com', 'contact@techsol.com', NOW(), NOW()), 
 (3, 'Global Industries', 'global.com', 'hello@global.com', NOW(), NOW());
 
-INSERT INTO customer_status (id, customer_id, status, comment, updated_at) VALUES 
-(1, 1, 'Active', 'Sample customer', NOW()), 
-(2, 2, 'Pending', 'New lead', NOW()), 
-(3, 3, 'Inactive', 'Old customer', NOW()), 
-(4, 1, 'Active', 'Another active', NOW());
+INSERT INTO customer_status (customer_id, status, comment, updated_at) VALUES 
+(1, 'approved', 'Customer approved for collaboration', NOW()), 
+(2, 'rejected', 'Not compatible with our products', NOW()), 
+(3, 'approved', 'Good fit for our services', NOW());
