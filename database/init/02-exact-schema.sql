@@ -40,7 +40,8 @@ CREATE TABLE dorks (
     country_code CHARACTER VARYING NOT NULL,
     industry_id INTEGER,
     content TEXT NOT NULL,
-    is_analyzed INTEGER
+    is_analyzed INTEGER,
+    started_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
 );
 
 -- Create customer_classifications table

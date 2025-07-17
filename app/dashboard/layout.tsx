@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { BarChart3, Users, Settings, Menu, X, Home, LogOut, User, Database } from "lucide-react"
+import { BarChart3, Users, Settings, Menu, X, Home, LogOut, User, Database, Play } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
 import ProtectedRoute from "@/components/ProtectedRoute"
@@ -25,6 +25,7 @@ const baseNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Customer Analysis", href: "/dashboard/customers", icon: Users },
   { name: "Customer Management", href: "/dashboard/customer_management", icon: BarChart3 },
+  { name: "Analysis Control", href: "/dashboard/analysis_control", icon: Play },
 ]
 
 // Admin-only navigation items
