@@ -62,7 +62,7 @@ CREATE TABLE customer_classifications (
 CREATE TABLE customer_status (
     id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('approved', 'rejected')),
+    status TEXT NOT NULL CHECK (status IN ('approved', 'rejected', 'pending')),
     comment TEXT,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     user_id INTEGER NOT NULL
