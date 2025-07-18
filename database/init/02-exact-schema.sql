@@ -150,19 +150,3 @@ VALUES
     true
 );
 
--- Insert sample data to support charts
-INSERT INTO industries (id, industry) VALUES 
-(1, 'Technology'), 
-(2, 'Manufacturing'), 
-(3, 'Healthcare'), 
-(4, 'Finance');
-
-INSERT INTO customers (id, name, website, contact_email, created_at, updated_at) VALUES 
-(1, 'Acme Corp', 'acme.com', 'info@acme.com', NOW(), NOW()), 
-(2, 'Tech Solutions', 'techsol.com', 'contact@techsol.com', NOW(), NOW()), 
-(3, 'Global Industries', 'global.com', 'hello@global.com', NOW(), NOW());
-
-INSERT INTO customer_status (customer_id, status, comment, updated_at, user_id) VALUES 
-(1, 'approved', 'Customer approved for collaboration', NOW(), 1), 
-(2, 'rejected', 'Not compatible with our products', NOW(), 1), 
-(3, 'approved', 'Good fit for our services', NOW(), 2);
