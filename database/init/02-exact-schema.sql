@@ -36,17 +36,18 @@ CREATE TABLE customers (
 
 -- Create dorks table
 CREATE TABLE dorks (
-    id INTEGER PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     country_code CHARACTER VARYING NOT NULL,
     industry_id INTEGER,
     content TEXT NOT NULL,
     is_analyzed INTEGER,
-    started_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
+    started_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
+    analyze_group_id INTEGER
 );
 
 -- Create customer_classifications table
 CREATE TABLE customer_classifications (
-    id INTEGER PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     customer_id INTEGER,
     dork_id INTEGER,
     has_metal_tin_clues TEXT,
