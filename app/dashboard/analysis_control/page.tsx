@@ -1,6 +1,6 @@
 "use client"
  
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -94,12 +94,31 @@ const mockJobs: AnalysisJob[] = [
 ]
  
 export default function AnalysisControlPage() {
-  const [jobs, setJobs] = useState<AnalysisJob[]>(mockJobs)
+  const [jobs, setJobs] = useState<AnalysisJob[]>([])
+  const [loading, setLoading] = useState(true)
   const [showNewAnalysis, setShowNewAnalysis] = useState(false)
   const [newAnalysis, setNewAnalysis] = useState({
     industry: "",
     countryCode: "",
   })
+
+  useEffect(() => {
+    fetchAnalysisJobs()
+  }, [])
+
+  const fetchAnalysisJobs = async () => {
+    try {
+      const response = await fetch('/api/analysis-jobs')
+      if (response.ok) {
+        const data = await response.json()
+        setJobs(data)
+      }
+    } catch (error) {
+      console.error('Error fetching analysis jobs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
  
   const handleStartAnalysis = () => {
     const dork = `site:.${newAnalysis.countryCode} intitle:"${newAnalysis.industry}"`
@@ -229,11 +248,29 @@ export default function AnalysisControlPage() {
     }
   }
  
-  const formatDuration = (startTime: string, endTime?: string) => {
-    const start = new Date(startTime)
-    const end = endTime ? new Date(endTime) : new Date()
-    const duration = Math.floor((end.getTime() - start.getTime()) / 1000 / 60)
-    return `${duration} min`
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "running":
+        return "Running"
+      case "completed":
+        return "Completed"
+      case "failed":
+        return "Failed"
+      default:
+        return status
+    }
+  }
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
   }
  
   return (
@@ -261,8 +298,18 @@ export default function AnalysisControlPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {jobs.map((job) => (
-              <div key={job.id} className="border rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-gray-500 mt-2">Loading analysis jobs...</p>
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No analysis jobs found</p>
+              </div>
+            ) : (
+              jobs.map((job) => (
+                <div key={job.id} className="border rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center space-x-3">
@@ -273,7 +320,7 @@ export default function AnalysisControlPage() {
                       </div>
                     </div>
                     <Badge className={getStatusColor(job.status)}>
-                      {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                      {getStatusText(job.status)}
                     </Badge>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -284,7 +331,7 @@ export default function AnalysisControlPage() {
                 <div className="flex items-center mb-4">
                   <div className="flex items-center text-sm text-gray-600">
                     <Users className="h-4 w-4 mr-2 text-green-600" />
-                    <span className="font-medium">{job.resultsCount} customer{job.resultsCount !== 1 ? 's' : ''} found</span>
+                    <span className="font-medium">{job.customerCount} customer{job.customerCount !== 1 ? 's' : ''} found</span>
                   </div>
                 </div>
  
@@ -308,16 +355,12 @@ export default function AnalysisControlPage() {
                 </div>
  
                 <div className="text-xs text-gray-500 text-right">
-                  <span>Started: {new Date(job.startTime).toLocaleString()}</span>
+                  <span>Started: {formatDateTime(job.startedAt)}</span>
                 </div>
  
-                {job.errorMessage && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600 font-medium">Error: {job.errorMessage}</p>
-                  </div>
-                )}
               </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
