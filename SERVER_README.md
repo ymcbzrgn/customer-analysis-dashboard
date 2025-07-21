@@ -1,277 +1,144 @@
-# Customer Analysis Dashboard - Server Deployment Guide
+# Customer Analysis Dashboard - Server Setup
 
-Bu rehber, Customer Analysis Dashboard projesini production ortamında çalıştırmanız için iki farklı yöntem sunmaktadır.
+Bu rehber, mevcut PostgreSQL server'ınızla Customer Analysis Dashboard'u çalıştırmanız için basit adımları içerir.
 
-## 📋 Önkoşullar
+## 🎯 Hızlı Başlangıç (3 Adım)
 
-- Docker ve Docker Compose kurulu olmalı
-- Node.js 18+ (yerel geliştirme için)
-- PostgreSQL 15+ server (Yöntem 1 için)
+### Adım 1: Database Schema'yı Yükle
 
-## 🚀 Deployment Yöntemleri
+Mevcut PostgreSQL server'ınızda aşağıdaki komutları çalıştırın:
 
-### **Yöntem 1: Mevcut PostgreSQL Server ile (Önerilen)**
+```bash
+# 1. Ana schema dosyasını yükle
+psql -h your_host -U postgres -d customer_analysis_db -f /mnt/wsl/docker-desktop-bind-mounts/Ubuntu/c9da6f1bcccd7ea9441c388029b85e33eaa32110a36ca79f5dbf9d979ee7a3a8/02-exact-schema.sql
 
-Bu yöntem, zaten çalışan bir PostgreSQL server'ınız varsa kullanılmalıdır.
-
-#### Adım 1: Database Schema Kurulumu
-
-1. Mevcut PostgreSQL server'ınızda yeni bir database oluşturun:
-```sql
-CREATE DATABASE customer_analysis_db;
+# 2. Charts tablosunu ekle
+psql -h your_host -U postgres -d customer_analysis_db -f /mnt/wsl/docker-desktop-bind-mounts/Ubuntu/c9da6f1bcccd7ea9441c388029b85e33eaa32110a36ca79f5dbf9d979ee7a3a8/04-add-charts-table.sql
 ```
 
-2. Schema migration script'ini çalıştırın:
+### Adım 2: Environment Dosyasını Ayarla
+
 ```bash
-# PostgreSQL server'ınıza bağlanın
-psql -h your_host -U postgres -d customer_analysis_db
-
-# Migration script'ini çalıştırın
-\i migrate-schema.sql
-```
-
-**⚠️ DİKKAT:** `migrate-schema.sql` dosyası mevcut tablolarınızı silecektir. Verilerinizi korumak istiyorsanız, dosyadaki `DROP TABLE` satırlarını yorum satırı haline getirin.
-
-#### Adım 2: Environment Konfigürasyonu
-
-1. `.env` dosyası oluşturun:
-```bash
+# .env dosyası oluştur
 cp .env.example .env
+
+# .env dosyasını düzenle
+nano .env
 ```
 
-2. `.env` dosyasını düzenleyin:
+.env dosyasında şu değerleri güncelle:
 ```bash
-# Database Configuration
 DATABASE_URL=postgresql://postgres:your_password@your_host:5432/customer_analysis_db
 DB_HOST=your_host
 DB_PORT=5432
 DB_NAME=customer_analysis_db
 DB_USER=postgres
 DB_PASSWORD=your_password
-DB_SCHEMA=public
-
-# JWT Secret
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-
-# App Configuration
-APP_URL=http://localhost:3000
-NODE_ENV=production
 ```
 
-#### Adım 3: Uygulama Çalıştırma
+### Adım 3: Uygulamayı Başlat
 
 ```bash
-# Sadece uygulamayı container'da çalıştır
+# Uygulamayı çalıştır
 docker-compose up app
 ```
 
-### **Yöntem 2: Tam Docker Setup (Development)**
+## 🔧 Konfigürasyon
 
-Bu yöntem hem PostgreSQL hem de uygulamayı Docker içinde çalıştırır.
+### Gerekli Environment Variables
 
-#### Adım 1: Environment Konfigürasyonu
+| Variable | Açıklama | Örnek |
+|----------|----------|-------|
+| `DATABASE_URL` | PostgreSQL bağlantı string'i | `postgresql://postgres:password@host:5432/db` |
+| `DB_HOST` | Database host adresi | `192.168.1.100` |
+| `DB_PORT` | Database port | `5432` |
+| `DB_NAME` | Database adı | `customer_analysis_db` |
+| `DB_USER` | Database kullanıcısı | `postgres` |
+| `DB_PASSWORD` | Database şifresi | `your_password` |
+| `JWT_SECRET` | JWT token anahtarı (min 32 karakter) | `your-super-secret-key` |
 
-```bash
-cp .env.example .env
-# .env dosyasında Docker için olan ayarları aktifleştirin
-```
+### Docker Compose Yapısı
 
-#### Adım 2: Tam Setup ile Çalıştırma
+- **Sadece uygulama container'ı** çalıştırılır
+- Mevcut PostgreSQL server'ınıza bağlanır
+- Port 3000'den erişim sağlar
 
-```bash
-# Hem database hem uygulama ile çalıştır
-docker-compose --profile with-db up
-```
+## 🔍 Test ve Doğrulama
 
-## 🛠️ Konfigürasyon Detayları
-
-### Database Connection
-
-Uygulama aşağıdaki sırayla bağlantı kurmaya çalışır:
-
-1. `DATABASE_URL` environment variable
-2. Ayrı ayrı DB_* environment variable'ları
-3. Default değerler
-
-### Environment Variables
-
-| Variable | Açıklama | Default |
-|----------|----------|---------|
-| `DATABASE_URL` | PostgreSQL bağlantı string'i | - |
-| `DB_HOST` | Database host adresi | localhost |
-| `DB_PORT` | Database port | 5432 |
-| `DB_NAME` | Database adı | customer_analysis_db |
-| `DB_USER` | Database kullanıcısı | postgres |
-| `DB_PASSWORD` | Database şifresi | - |
-| `JWT_SECRET` | JWT token şifreleme anahtarı | - |
-| `NODE_ENV` | Ortam tipi | development |
-| `APP_URL` | Uygulama URL'i | http://localhost:3000 |
-
-### Docker Compose Servisleri
-
-#### `app` Servisi
-- **Port:** 3000
-- **Environment:** Production optimized
-- **Network:** Bridge connection
-- **Dependencies:** PostgreSQL (host.docker.internal veya postgres service)
-
-#### `postgres` Servisi (Opsiyonel)
-- **Port:** 5432
-- **Profile:** `with-db`
-- **Data:** Persistent volume
-- **Init Scripts:** `./database/init/` klasörü
-
-## 🔧 Troubleshooting
-
-### Bağlantı Sorunları
-
-1. **Docker'dan host makineye bağlantı:**
-```bash
-# Windows/Mac için
-host.docker.internal
-
-# Linux için
-host.docker.internal
-# veya docker0 bridge IP'si
-172.17.0.1
-```
-
-2. **PostgreSQL bağlantısını test edin:**
+### Database Bağlantı Testi
 ```bash
 # Container içinden test
 docker exec -it customer_analysis_app sh
-npm run test:db
+node -e "console.log(process.env.DATABASE_URL)"
 ```
 
-### Schema Sorunları
-
-1. **Migration script'i tekrar çalıştırın:**
+### Uygulama Kontrolü
 ```bash
-psql -h your_host -U postgres -d customer_analysis_db -f migrate-schema.sql
-```
-
-2. **Manuel schema kontrolü:**
-```sql
--- Tablolar var mı kontrol edin
-\dt
-
--- Users tablosunu kontrol edin
-SELECT * FROM users LIMIT 5;
-```
-
-### Container Sorunları
-
-1. **Logları kontrol edin:**
-```bash
+# Logları kontrol et
 docker-compose logs app
-docker-compose logs postgres
-```
 
-2. **Container'ı yeniden başlatın:**
-```bash
-docker-compose restart app
-```
-
-3. **Container'ı sıfırdan oluşturun:**
-```bash
-docker-compose down
-docker-compose build --no-cache app
-docker-compose up app
+# Health check
+curl http://localhost:3000
 ```
 
 ## 📊 Varsayılan Kullanıcılar
 
-Migration script çalıştırıldıktan sonra aşağıdaki kullanıcılar oluşturulur:
+Schema yüklendikten sonra şu kullanıcılar oluşturulur:
 
 ### Admin Kullanıcı
 - **Email:** admin@example.com
 - **Password:** admin123
 - **Role:** admin
-- **Permissions:** Tüm yetkilere sahip
 
 ### Normal Kullanıcı
 - **Email:** user@example.com
 - **Password:** user123
 - **Role:** user
-- **Permissions:** Sadece okuma yetkisi
 
-## 🚀 Production Deployment
+## 🚨 Troubleshooting
 
-### Security Checklist
-
-1. **JWT Secret'ı değiştirin:**
+### Bağlantı Sorunları
 ```bash
-# Güçlü bir secret oluşturun
-openssl rand -base64 32
+# Database bağlantısını test et
+telnet your_host 5432
+
+# Container loglarını kontrol et
+docker logs customer_analysis_app
 ```
 
-2. **Database şifrelerini güncelleyin**
-3. **SSL sertifikası ekleyin**
-4. **Firewall kuralları ayarlayın**
-5. **Backup stratejisi oluşturun**
-
-### Performance Optimizations
-
-1. **Database connection pooling** zaten aktif
-2. **Container resource limits** ayarlayın:
-```yaml
-app:
-  deploy:
-    resources:
-      limits:
-        memory: 1G
-        cpus: '0.5'
-```
-
-### Monitoring
-
-1. **Health check endpoint:** `/api/health`
-2. **Database connection test:** `/api/test-env`
-3. **Container logs:** `docker-compose logs -f app`
-
-## 📁 Dizin Yapısı
-
-```
-customer-analysis-dashboard/
-├── app/                    # Next.js app router
-├── components/             # React components
-├── lib/                    # Database ve utility fonksiyonları
-├── database/
-│   └── init/              # PostgreSQL init scripts
-├── docker-compose.yml     # Docker configuration
-├── Dockerfile            # App container definition
-├── migrate-schema.sql    # Database migration script
-├── .env.example          # Environment template
-└── SERVER_README.md      # Bu dosya
-```
-
-## 🔄 Updates ve Maintenance
-
-### Code Update
+### Schema Sorunları
 ```bash
-git pull origin main
-docker-compose build --no-cache app
+# Tabloları kontrol et
+psql -h your_host -U postgres -d customer_analysis_db -c "\dt"
+
+# Users tablosunu kontrol et
+psql -h your_host -U postgres -d customer_analysis_db -c "SELECT * FROM users LIMIT 5;"
+```
+
+### Container Sorunları
+```bash
+# Container'ı yeniden başlat
 docker-compose restart app
+
+# Container'ı yeniden oluştur
+docker-compose down
+docker-compose build --no-cache app
+docker-compose up app
 ```
 
-### Database Backup
+## 🔄 Güncelleme
+
 ```bash
-# Backup oluştur
-pg_dump -h your_host -U postgres customer_analysis_db > backup.sql
+# Kodu güncelle
+git pull
 
-# Backup'tan geri yükle
-psql -h your_host -U postgres customer_analysis_db < backup.sql
-```
-
-### Container Cleanup
-```bash
-# Kullanılmayan image'leri temizle
-docker system prune -f
-
-# Volume'leri temizle (dikkatli olun!)
-docker volume prune
+# Container'ı yeniden oluştur ve başlat
+docker-compose down
+docker-compose build --no-cache app
+docker-compose up app
 ```
 
 ---
 
-Bu rehber sizin projenizi hızlıca çalışır hale getirmenizi sağlayacaktır. Herhangi bir sorun yaşarsanız, troubleshooting bölümünü kontrol edin veya logları inceleyin.
+**Not:** Bu setup sadece mevcut PostgreSQL server'ınızla çalışır. Database container'ı oluşturulmaz.

@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Next.js Application
+  # Next.js Application - connects to external PostgreSQL
   app:
     build:
       context: .
@@ -10,39 +10,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:postgres_password_2024@host.docker.internal:5432/customer_analysis_db
-      - NEXTAUTH_SECRET=your-secret-key-here
-      - NEXTAUTH_URL=http://localhost:3000
+    env_file:
+      - .env
     networks:
       - customer_analysis_network
-    depends_on:
-      - postgres
-
-  # PostgreSQL Database (optional - for local development)
-  postgres:
-    image: postgres:15-alpine
-    container_name: customer_analysis_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: customer_analysis_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password_2024
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d
-    networks:
-      - customer_analysis_network
-    profiles:
-      - with-db
-
-volumes:
-  postgres_data:
-    driver: local
 
 networks:
   customer_analysis_network:
