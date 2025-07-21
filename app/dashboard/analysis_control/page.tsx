@@ -32,28 +32,16 @@ interface AnalysisJob {
   errorMessage?: string
 }
 
-const countries = [
-  { code: "tr", name: "Turkey", flag: "🇹🇷" },
-  { code: "de", name: "Germany", flag: "🇩🇪" },
-  { code: "fr", name: "France", flag: "🇫🇷" },
-  { code: "us", name: "United States", flag: "🇺🇸" },
-  { code: "uk", name: "United Kingdom", flag: "🇬🇧" },
-  { code: "it", name: "Italy", flag: "🇮🇹" },
-  { code: "es", name: "Spain", flag: "🇪🇸" },
-  { code: "nl", name: "Netherlands", flag: "🇳🇱" },
-  { code: "ca", name: "Canada", flag: "🇨🇦" },
-  { code: "au", name: "Australia", flag: "🇦🇺" },
-  { code: "jp", name: "Japan", flag: "🇯🇵" },
-  { code: "br", name: "Brazil", flag: "🇧🇷" },
-  { code: "mx", name: "Mexico", flag: "🇲🇽" },
-  { code: "in", name: "India", flag: "🇮🇳" },
-  { code: "cn", name: "China", flag: "🇨🇳" },
-]
+interface Country {
+  id: number
+  name: string
+  code: string
+}
 
-const industries = [
-  "cosmetics", "packaging", "food", "automotive", "technology", "healthcare", 
-  "fashion", "electronics", "construction", "agriculture", "finance", "education"
-]
+interface Industry {
+  id: number
+  industry: string
+}
  
 const mockJobs: AnalysisJob[] = [
   {
@@ -95,7 +83,10 @@ const mockJobs: AnalysisJob[] = [
  
 export default function AnalysisControlPage() {
   const [jobs, setJobs] = useState<AnalysisJob[]>([])
+  const [countries, setCountries] = useState<Country[]>([])
+  const [industries, setIndustries] = useState<Industry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingData, setLoadingData] = useState(false)
   const [showNewAnalysis, setShowNewAnalysis] = useState(false)
   const [newAnalysis, setNewAnalysis] = useState({
     industry: "",
@@ -104,7 +95,39 @@ export default function AnalysisControlPage() {
 
   useEffect(() => {
     fetchAnalysisJobs()
+    fetchCountriesAndIndustries()
   }, [])
+
+  const fetchCountriesAndIndustries = async () => {
+    setLoadingData(true)
+    try {
+      const [countriesResponse, industriesResponse] = await Promise.all([
+        fetch('/api/countries'),
+        fetch('/api/industries')
+      ])
+
+      if (countriesResponse.ok) {
+        const countriesData = await countriesResponse.json()
+        setCountries(countriesData)
+      }
+
+      if (industriesResponse.ok) {
+        const industriesData = await industriesResponse.json()
+        if (industriesData.success && industriesData.industries) {
+          // Map the structure to match our interface
+          const mappedIndustries = industriesData.industries.map((item: any) => ({
+            id: item.id,
+            industry: item.name || item.industry
+          }))
+          setIndustries(mappedIndustries)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching countries and industries:', error)
+    } finally {
+      setLoadingData(false)
+    }
+  }
 
   const fetchAnalysisJobs = async () => {
     try {
@@ -120,14 +143,39 @@ export default function AnalysisControlPage() {
     }
   }
  
-  const handleStartAnalysis = () => {
-    const dork = `site:.${newAnalysis.countryCode} intitle:"${newAnalysis.industry}"`
+  const handleStartAnalysis = async () => {
+    const selectedCountry = countries.find(c => c.code === newAnalysis.countryCode)
+    const selectedIndustry = industries.find(i => i.industry === newAnalysis.industry)
+    
+    const dorkKeywords = `${selectedCountry?.name} ${selectedIndustry?.industry}`
+
+    try {
+      // Send webhook GET request with parameters
+      const webhookUrl = new URL('http://localhost:5678/webhook-test/c43c60c5-a3a6-498a-a607-9f3fb33f9ad1')
+      webhookUrl.searchParams.append('keywords', dorkKeywords)
+      webhookUrl.searchParams.append('country', selectedCountry?.name || '')
+      webhookUrl.searchParams.append('countryCode', newAnalysis.countryCode)
+      webhookUrl.searchParams.append('industry', selectedIndustry?.industry || '')
+
+      const webhookResponse = await fetch(webhookUrl.toString(), {
+        method: 'GET',
+      })
+
+      if (webhookResponse.ok) {
+        const result = await webhookResponse.json()
+        console.log('Webhook request sent successfully:', result)
+      } else {
+        console.error('Failed to send webhook request')
+      }
+    } catch (error) {
+      console.error('Error sending webhook request:', error)
+    }
 
     const newJob: AnalysisJob = {
       id: Date.now().toString(),
       industry: newAnalysis.industry,
       countryCode: newAnalysis.countryCode,
-      dork: dork,
+      dork: `site:.${newAnalysis.countryCode} intitle:"${newAnalysis.industry}"`,
       status: "running",
       progress: 0,
       startTime: new Date().toISOString(),
@@ -388,13 +436,12 @@ export default function AnalysisControlPage() {
                 onValueChange={(value) => setNewAnalysis({ ...newAnalysis, countryCode: value })}
               >
                 <SelectTrigger className="h-12 text-left">
-                  <SelectValue placeholder="Choose a country..." />
+                  <SelectValue placeholder={loadingData ? "Loading countries..." : "Choose a country..."} />
                 </SelectTrigger>
                 <SelectContent>
                   {countries.map((country) => (
                     <SelectItem key={country.code} value={country.code}>
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">{country.flag}</span>
                         <span className="font-medium">{country.name}</span>
                         <span className="text-gray-500 text-sm">({country.code.toUpperCase()})</span>
                       </div>
@@ -414,12 +461,12 @@ export default function AnalysisControlPage() {
                 onValueChange={(value) => setNewAnalysis({ ...newAnalysis, industry: value })}
               >
                 <SelectTrigger className="h-12 text-left">
-                  <SelectValue placeholder="Select an industry..." />
+                  <SelectValue placeholder={loadingData ? "Loading industries..." : "Select an industry..."} />
                 </SelectTrigger>
                 <SelectContent>
                   {industries.map((industry) => (
-                    <SelectItem key={industry} value={industry}>
-                      <span className="capitalize font-medium">{industry}</span>
+                    <SelectItem key={industry.id} value={industry.industry}>
+                      <span className="capitalize font-medium">{industry.industry}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
