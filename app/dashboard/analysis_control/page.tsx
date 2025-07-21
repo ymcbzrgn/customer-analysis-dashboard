@@ -82,15 +82,18 @@ export default function AnalysisControlPage() {
     const dorkKeywords = `${selectedCountry?.name} ${selectedIndustry?.industry}`
 
     try {
-      // Send webhook GET request with parameters
-      const webhookUrl = new URL('http://localhost:5678/webhook-test/c43c60c5-a3a6-498a-a607-9f3fb33f9ad1')
-      webhookUrl.searchParams.append('keywords', dorkKeywords)
-      webhookUrl.searchParams.append('country', selectedCountry?.name || '')
-      webhookUrl.searchParams.append('countryCode', newAnalysis.countryCode)
-      webhookUrl.searchParams.append('industry', selectedIndustry?.industry || '')
-
-      const webhookResponse = await fetch(webhookUrl.toString(), {
-        method: 'GET',
+      // Send webhook POST request with parameters
+      const webhookResponse = await fetch('http://localhost:5678/webhook-test/c43c60c5-a3a6-498a-a607-9f3fb33f9ad1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          keywords: dorkKeywords,
+          country: selectedCountry?.name || '',
+          countryCode: newAnalysis.countryCode,
+          industry: selectedIndustry?.industry || ''
+        })
       })
 
       if (webhookResponse.ok) {
