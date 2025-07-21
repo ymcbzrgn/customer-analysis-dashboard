@@ -115,7 +115,7 @@ export default function AnalysisControlPage() {
 
     try {
       // Send webhook GET request with parameters
-      const webhookUrl = new URL('http://localhost:5678/webhook-test/a0799c27-2d96-4c19-9de1-98132570e86e')
+      const webhookUrl = new URL('http://localhost:5678/webhook-test/c43c60c5-a3a6-498a-a607-9f3fb33f9ad1')
       webhookUrl.searchParams.append('keywords', dorkKeywords)
       webhookUrl.searchParams.append('country', selectedCountry?.name || '')
       webhookUrl.searchParams.append('countryCode', newAnalysis.countryCode)
