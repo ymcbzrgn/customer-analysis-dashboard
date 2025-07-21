@@ -1,6 +1,26 @@
 version: '3.8'
 
 services:
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: customer_analysis_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres_password_2024@host.docker.internal:5432/customer_analysis_db
+      - NEXTAUTH_SECRET=your-secret-key-here
+      - NEXTAUTH_URL=http://localhost:3000
+    networks:
+      - customer_analysis_network
+    depends_on:
+      - postgres
+
+  # PostgreSQL Database (optional - for local development)
   postgres:
     image: postgres:15-alpine
     container_name: customer_analysis_postgres
@@ -17,30 +37,11 @@ services:
       - ./database/init:/docker-entrypoint-initdb.d
     networks:
       - customer_analysis_network
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: customer_analysis_pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@customeranalysis.com
-      PGADMIN_DEFAULT_PASSWORD: pgadmin_password_2024
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-    ports:
-      - "8080:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./database/pgadmin-servers.json:/pgadmin4/servers.json
-    networks:
-      - customer_analysis_network
-    depends_on:
-      - postgres
+    profiles:
+      - with-db
 
 volumes:
   postgres_data:
-    driver: local
-  pgadmin_data:
     driver: local
 
 networks:
