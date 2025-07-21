@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     // For now, return all customers regardless of user (temporary fix)
     // TODO: Add user_id column to customers table for proper user association
     const customers = await dbPostgres.query(`
-      SELECT 
+      SELECT DISTINCT ON (c.id)
         c.id, 
         c.name, 
         c.website, 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN customer_classifications cc ON c.id = cc.customer_id
       LEFT JOIN dorks d ON cc.dork_id = d.id
       LEFT JOIN industries i ON d.industry_id = i.id
-      ORDER BY c.created_at DESC
+      ORDER BY c.id, cc.compatibility_score DESC NULLS LAST, c.created_at DESC
     `)
     
     return NextResponse.json({ 

@@ -70,6 +70,29 @@ CREATE TABLE dorks (
     analyze_group_id INTEGER
 );
 
+-- Create customer_classifications table
+CREATE TABLE customer_classifications (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER,
+    dork_id INTEGER,
+    has_metal_tin_clues TEXT,
+    compatible_with_masas_products TEXT,
+    compatibility_score INTEGER,
+    should_send_intro_email TEXT,
+    description TEXT,
+    detailed_compatibility_score INTEGER
+);
+
+-- Create customer_status table
+CREATE TABLE customer_status (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('approved', 'rejected', 'pending')),
+    comment TEXT,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    user_id INTEGER NOT NULL
+);
+
 -- Create email table
 CREATE TABLE email (
     id INTEGER PRIMARY KEY,
