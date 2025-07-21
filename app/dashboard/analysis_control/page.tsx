@@ -43,43 +43,7 @@ interface Industry {
   industry: string
 }
  
-const mockJobs: AnalysisJob[] = [
-  {
-    id: "1",
-    industry: "cosmetics",
-    countryCode: "tr",
-    dork: "site:.tr intitle:\"cosmetics\"",
-    status: "completed",
-    progress: 100,
-    startTime: "2024-01-15T10:30:00Z",
-    endTime: "2024-01-15T11:45:00Z",
-    resultsCount: 42,
-    foundedDorks: ["beauty", "skincare", "makeup", "cosmetic", "parfum"]
-  },
-  {
-    id: "2",
-    industry: "packaging",
-    countryCode: "de",
-    dork: "site:.de intitle:\"packaging\"",
-    status: "running",
-    progress: 65,
-    startTime: "2024-01-15T14:20:00Z",
-    resultsCount: 28,
-    foundedDorks: ["verpackung", "packaging", "karton", "box"]
-  },
-  {
-    id: "3",
-    industry: "food",
-    countryCode: "fr",
-    dork: "site:.fr intitle:\"food\"",
-    status: "failed",
-    progress: 25,
-    startTime: "2024-01-15T09:15:00Z",
-    resultsCount: 7,
-    errorMessage: "Connection timeout",
-    foundedDorks: ["alimentation", "food"]
-  },
-]
+// Mock jobs removed - using real data from API
  
 export default function AnalysisControlPage() {
   const [jobs, setJobs] = useState<AnalysisJob[]>([])
@@ -151,7 +115,7 @@ export default function AnalysisControlPage() {
 
     try {
       // Send webhook GET request with parameters
-      const webhookUrl = new URL('http://localhost:5678/webhook-test/c43c60c5-a3a6-498a-a607-9f3fb33f9ad1')
+      const webhookUrl = new URL('http://localhost:5678/webhook-test/a0799c27-2d96-4c19-9de1-98132570e86e')
       webhookUrl.searchParams.append('keywords', dorkKeywords)
       webhookUrl.searchParams.append('country', selectedCountry?.name || '')
       webhookUrl.searchParams.append('countryCode', newAnalysis.countryCode)
@@ -171,79 +135,42 @@ export default function AnalysisControlPage() {
       console.error('Error sending webhook request:', error)
     }
 
-    const newJob: AnalysisJob = {
-      id: Date.now().toString(),
-      industry: newAnalysis.industry,
-      countryCode: newAnalysis.countryCode,
-      dork: `site:.${newAnalysis.countryCode} intitle:"${newAnalysis.industry}"`,
-      status: "running",
-      progress: 0,
-      startTime: new Date().toISOString(),
-      resultsCount: 0,
-      foundedDorks: [],
-    }
-
-    setJobs([newJob, ...jobs])
     setShowNewAnalysis(false)
     setNewAnalysis({
       industry: "",
       countryCode: "",
     })
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setJobs((prevJobs) =>
-        prevJobs.map((job) => {
-          if (job.id === newJob.id && job.status === "running") {
-            const newProgress = Math.min(job.progress + Math.random() * 15, 100)
-            const maxResults = Math.floor(Math.random() * 50) + 20 // Random between 20-70
-            const newResultsCount = Math.floor((newProgress / 100) * maxResults)
-
-            // Generate random founded dorks based on industry
-            const generateRandomDorks = (industry: string) => {
-              const dorkOptions = {
-                cosmetics: ["beauty", "skincare", "makeup", "cosmetic", "parfum", "lipstick", "foundation", "mascara"],
-                packaging: ["verpackung", "packaging", "karton", "box", "container", "wrapper"],
-                food: ["alimentation", "food", "cuisine", "restaurant", "recipe", "nutrition"],
-                automotive: ["car", "auto", "vehicle", "motor", "garage", "mechanic"],
-                technology: ["tech", "software", "digital", "IT", "computer", "app"],
-                healthcare: ["health", "medical", "clinic", "hospital", "doctor", "medicine"],
-                fashion: ["fashion", "clothing", "style", "wear", "dress", "outfit"],
-                electronics: ["electronic", "gadget", "device", "circuit", "component"],
-                construction: ["construction", "building", "architecture", "engineer"],
-                agriculture: ["agriculture", "farming", "crop", "harvest", "organic"],
-                finance: ["finance", "bank", "investment", "money", "loan"],
-                education: ["education", "school", "learning", "course", "training"]
-              }
-              
-              const availableDorks = dorkOptions[industry] || [industry]
-              const numberOfDorks = Math.floor((newProgress / 100) * availableDorks.length)
-              return availableDorks.slice(0, Math.max(1, numberOfDorks))
-            }
-
-            if (newProgress >= 100) {
-              clearInterval(interval)
-              return {
-                ...job,
-                progress: 100,
-                status: "completed" as const,
-                endTime: new Date().toISOString(),
-                resultsCount: newResultsCount,
-                foundedDorks: generateRandomDorks(job.industry),
-              }
-            }
-
-            return {
-              ...job,
-              progress: newProgress,
-              resultsCount: newResultsCount,
-              foundedDorks: generateRandomDorks(job.industry),
-            }
-          }
-          return job
+    // Start real analysis job - no simulation
+    try {
+      const response = await fetch('/api/analysis-jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          industry: newAnalysis.industry,
+          countryCode: newAnalysis.countryCode,
+          dork: `site:.${newAnalysis.countryCode} intitle:"${newAnalysis.industry}"`,
         }),
-      )
-    }, 1000)
+      })
+
+      if (response.ok) {
+        const createdJob = await response.json()
+        setJobs([createdJob, ...jobs])
+        console.log('Analysis job created successfully:', createdJob)
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to create analysis job:', errorData)
+        alert(`Failed to create analysis job: ${errorData.error}`)
+      }
+    } catch (error) {
+      console.error('Error creating analysis job:', error)
+      alert('Error creating analysis job. Please try again.')
+    }
+
+    // Refresh the jobs list to get updated data
+    fetchAnalysisJobs()
   }
  
   const handleJobAction = (jobId: string, action: "pause" | "resume" | "stop") => {

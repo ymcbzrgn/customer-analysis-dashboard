@@ -64,6 +64,76 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { industry, countryCode, dork } = body
+
+    if (!industry || !countryCode) {
+      return NextResponse.json(
+        { error: 'Industry and country code are required' },
+        { status: 400 }
+      )
+    }
+
+    // Get industry_id from industry name
+    const industryQuery = `SELECT id FROM industries WHERE industry ILIKE $1`
+    const industryResult = await dbPostgres.query(industryQuery, [industry])
+    
+    if (industryResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Industry not found' },
+        { status: 404 }
+      )
+    }
+
+    const industryId = industryResult.rows[0].id
+
+    // Create a new analyze_group_id
+    const maxGroupIdQuery = `SELECT COALESCE(MAX(analyze_group_id), 0) + 1 as next_group_id FROM dorks`
+    const maxGroupIdResult = await dbPostgres.query(maxGroupIdQuery)
+    const analyzeGroupId = maxGroupIdResult.rows[0].next_group_id
+
+    // Insert new dork entry
+    const insertQuery = `
+      INSERT INTO dorks (country_code, industry_id, content, is_analyzed, started_at, analyze_group_id)
+      VALUES ($1, $2, $3, $4, NOW(), $5)
+      RETURNING id, started_at
+    `
+    
+    const insertResult = await dbPostgres.query(insertQuery, [
+      countryCode,
+      industryId,
+      dork || `site:.${countryCode} intitle:"${industry}"`,
+      1, // 1 = running status
+      analyzeGroupId
+    ])
+
+    const newDork = insertResult.rows[0]
+
+    // Return the created job
+    const createdJob = {
+      id: `group-${analyzeGroupId}`,
+      industry: industry,
+      countryCode: countryCode,
+      dork: dork || `site:.${countryCode} intitle:"${industry}"`,
+      status: 'running',
+      progress: 0,
+      startTime: newDork.started_at,
+      resultsCount: 0,
+      foundedDorks: [],
+    }
+
+    return NextResponse.json(createdJob)
+  } catch (error) {
+    console.error('Error creating analysis job:', error)
+    return NextResponse.json(
+      { error: 'Failed to create analysis job' },
+      { status: 500 }
+    )
+  }
+}
+
 function getStatusFromAnalyzed(isAnalyzed: number): string {
   switch (isAnalyzed) {
     case 0:
