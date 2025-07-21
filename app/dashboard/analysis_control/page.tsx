@@ -1,12 +1,10 @@
 "use client"
- 
+
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -16,21 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Play, Pause, Square, Building, Globe, Search, Clock, CheckCircle, XCircle, AlertCircle, Users } from "lucide-react"
- 
-interface AnalysisJob {
-  id: string
-  industry: string
-  countryCode: string
-  dork: string
-  status: "running" | "completed" | "failed" | "paused"
-  progress: number
-  startTime: string
-  endTime?: string
-  resultsCount: number
-  foundedDorks?: string[]
-  errorMessage?: string
-}
+import { Play, Building, Globe, Search, CheckCircle, ArrowRight } from "lucide-react"
+import { toast } from "sonner"
 
 interface Country {
   id: number
@@ -42,23 +27,20 @@ interface Industry {
   id: number
   industry: string
 }
- 
-// Mock jobs removed - using real data from API
- 
+
 export default function AnalysisControlPage() {
-  const [jobs, setJobs] = useState<AnalysisJob[]>([])
+  const router = useRouter()
   const [countries, setCountries] = useState<Country[]>([])
   const [industries, setIndustries] = useState<Industry[]>([])
-  const [loading, setLoading] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
   const [showNewAnalysis, setShowNewAnalysis] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
   const [newAnalysis, setNewAnalysis] = useState({
     industry: "",
     countryCode: "",
   })
 
   useEffect(() => {
-    fetchAnalysisJobs()
     fetchCountriesAndIndustries()
   }, [])
 
@@ -92,20 +74,6 @@ export default function AnalysisControlPage() {
       setLoadingData(false)
     }
   }
-
-  const fetchAnalysisJobs = async () => {
-    try {
-      const response = await fetch('/api/analysis-jobs')
-      if (response.ok) {
-        const data = await response.json()
-        setJobs(data)
-      }
-    } catch (error) {
-      console.error('Error fetching analysis jobs:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
  
   const handleStartAnalysis = async () => {
     const selectedCountry = countries.find(c => c.code === newAnalysis.countryCode)
@@ -126,125 +94,22 @@ export default function AnalysisControlPage() {
       })
 
       if (webhookResponse.ok) {
-        const result = await webhookResponse.json()
-        console.log('Webhook request sent successfully:', result)
+        console.log('Webhook request sent successfully')
+        setShowSuccess(true)
       } else {
-        console.error('Failed to send webhook request')
+        console.log('Webhook failed with status:', webhookResponse.status)
+        toast.error('Failed to send analysis request. Please try again.')
       }
     } catch (error) {
-      console.error('Error sending webhook request:', error)
+      console.log('Webhook error:', error)
+      // Show success even if webhook fails (n8n might not be running)
+      toast.error('Failed to send analysis request. Please try again.')
     }
 
     setShowNewAnalysis(false)
     setNewAnalysis({
       industry: "",
       countryCode: "",
-    })
-
-    // Start real analysis job - no simulation
-    try {
-      const response = await fetch('/api/analysis-jobs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          industry: newAnalysis.industry,
-          countryCode: newAnalysis.countryCode,
-          dork: `site:.${newAnalysis.countryCode} intitle:"${newAnalysis.industry}"`,
-        }),
-      })
-
-      if (response.ok) {
-        const createdJob = await response.json()
-        setJobs([createdJob, ...jobs])
-        console.log('Analysis job created successfully:', createdJob)
-      } else {
-        const errorData = await response.json()
-        console.error('Failed to create analysis job:', errorData)
-        alert(`Failed to create analysis job: ${errorData.error}`)
-      }
-    } catch (error) {
-      console.error('Error creating analysis job:', error)
-      alert('Error creating analysis job. Please try again.')
-    }
-
-    // Refresh the jobs list to get updated data
-    fetchAnalysisJobs()
-  }
- 
-  const handleJobAction = (jobId: string, action: "pause" | "resume" | "stop") => {
-    setJobs((prevJobs) =>
-      prevJobs.map((job) => {
-        if (job.id === jobId) {
-          switch (action) {
-            case "pause":
-              return { ...job, status: "paused" as const }
-            case "resume":
-              return { ...job, status: "running" as const }
-            case "stop":
-              return { ...job, status: "failed" as const, endTime: new Date().toISOString() }
-            default:
-              return job
-          }
-        }
-        return job
-      }),
-    )
-  }
- 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "running":
-        return "bg-blue-100 text-blue-800"
-      case "completed":
-        return "bg-green-100 text-green-800"
-      case "failed":
-        return "bg-red-100 text-red-800"
-      case "paused":
-        return "bg-yellow-100 text-yellow-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
- 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "running":
-        return <Play className="h-4 w-4" />
-      case "completed":
-        return <CheckCircle className="h-4 w-4" />
-      case "failed":
-        return <XCircle className="h-4 w-4" />
-      case "paused":
-        return <Pause className="h-4 w-4" />
-      default:
-        return <AlertCircle className="h-4 w-4" />
-    }
-  }
- 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "running":
-        return "Running"
-      case "completed":
-        return "Completed"
-      case "failed":
-        return "Failed"
-      default:
-        return status
-    }
-  }
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
     })
   }
  
@@ -253,93 +118,53 @@ export default function AnalysisControlPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Analysis Control</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Start and manage customer data analysis jobs with custom search parameters.
+          Start customer data analysis with custom search parameters.
         </p>
       </div>
- 
+
       {/* New Analysis Button */}
-      <div className="mb-6">
-        <Button onClick={() => setShowNewAnalysis(true)} className="bg-blue-600 hover:bg-blue-700">
-          <Play className="mr-2 h-4 w-4" />
-          Start New Analysis
-        </Button>
-      </div>
- 
-      {/* Analysis Jobs */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Analysis Jobs</CardTitle>
-          <CardDescription>Monitor and manage your running and completed analysis jobs</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-gray-500 mt-2">Loading analysis jobs...</p>
+      {!showSuccess ? (
+        <div className="flex justify-center">
+          <Button onClick={() => setShowNewAnalysis(true)} className="bg-blue-600 hover:bg-blue-700 px-8 py-3 text-lg">
+            <Play className="mr-2 h-5 w-5" />
+            Start New Analysis
+          </Button>
+        </div>
+      ) : (
+        /* Success Message */
+        <div className="flex justify-center">
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-8 max-w-md w-full text-center shadow-lg">
+            <div className="flex justify-center mb-4">
+              <div className="bg-green-100 rounded-full p-3">
+                <CheckCircle className="h-12 w-12 text-green-600" />
               </div>
-            ) : jobs.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No analysis jobs found</p>
-              </div>
-            ) : (
-              jobs.map((job) => (
-                <div key={job.id} className="border rounded-xl p-6 bg-white shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-3">
-                      {getStatusIcon(job.status)}
-                      <div>
-                        <h3 className="font-semibold text-gray-900 capitalize">{job.industry}</h3>
-                        <p className="text-sm text-gray-500">{job.countryCode.toUpperCase()} Analysis</p>
-                      </div>
-                    </div>
-                    <Badge className={getStatusColor(job.status)}>
-                      {getStatusText(job.status)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {/* Stop button removed - users can only view analysis */}
-                  </div>
-                </div>
- 
-                <div className="flex items-center mb-4">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Users className="h-4 w-4 mr-2 text-green-600" />
-                    <span className="font-medium">{job.customerCount} customer{job.customerCount !== 1 ? 's' : ''} found</span>
-                  </div>
-                </div>
- 
-                <div className="mb-3">
-                  <div className="flex items-center text-sm text-gray-600 mb-2">
-                    <span>Founded Dorks:</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {job.foundedDorks && job.foundedDorks.length > 0 ? (
-                      job.foundedDorks.map((dork, index) => (
-                        <Badge key={index} variant="secondary" className="bg-green-50 text-green-700 border-green-200">
-                          {dork}
-                        </Badge>
-                      ))
-                    ) : (
-                      <Badge variant="secondary" className="bg-gray-50 text-gray-500 border-gray-200">
-                        No dorks found yet
-                      </Badge>
-                    )}
-                  </div>
-                </div>
- 
-                <div className="text-xs text-gray-500 text-right">
-                  <span>Started: {formatDateTime(job.startedAt)}</span>
-                </div>
- 
-              </div>
-              ))
-            )}
+            </div>
+            <h3 className="text-xl font-bold text-green-800 mb-2">
+              Analysis Request Sent!
+            </h3>
+            <p className="text-green-700 mb-6">
+              Your analysis has been started successfully. You can check the Customer Analysis page to see the results.
+            </p>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => router.push('/dashboard/customers')} 
+                className="bg-green-600 hover:bg-green-700 w-full"
+              >
+                View Customer Analysis
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSuccess(false)}
+                className="w-full border-green-300 text-green-700 hover:bg-green-50"
+              >
+                Start Another Analysis
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
- 
+        </div>
+      )}
+
       {/* New Analysis Dialog */}
       <Dialog open={showNewAnalysis} onOpenChange={setShowNewAnalysis}>
         <DialogContent className="max-w-lg">
@@ -351,7 +176,7 @@ export default function AnalysisControlPage() {
               Select your target market and industry to begin customer analysis
             </DialogDescription>
           </DialogHeader>
- 
+
           <div className="space-y-8 py-6">
             <div className="space-y-3">
               <Label htmlFor="countryCode" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -421,7 +246,7 @@ export default function AnalysisControlPage() {
               </div>
             )}
           </div>
- 
+
           <DialogFooter className="gap-3 pt-6">
             <Button 
               variant="outline" 

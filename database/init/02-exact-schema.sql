@@ -66,8 +66,7 @@ CREATE TABLE dorks (
     industry_id INTEGER,
     content TEXT NOT NULL,
     is_analyzed INTEGER,
-    started_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
-    analyze_group_id INTEGER
+    started_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
 );
 
 -- Create customer_classifications table
