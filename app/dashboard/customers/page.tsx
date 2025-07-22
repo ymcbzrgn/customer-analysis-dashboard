@@ -880,7 +880,7 @@ export default function CustomersPage() {
         setCustomerEmails([])
         setEmailsLoading(false)
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-3">
               <Avatar className="h-12 w-12">
