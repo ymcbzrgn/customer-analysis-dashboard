@@ -77,6 +77,8 @@ export default function CustomersPage() {
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<Customer | null>(null)
   const [detailModalComment, setDetailModalComment] = useState("")
   const [isEditingComment, setIsEditingComment] = useState(false)
+  const [customerEmails, setCustomerEmails] = useState<{id: number; customer_id: number; content: string}[]>([])
+  const [emailsLoading, setEmailsLoading] = useState(false)
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -137,6 +139,26 @@ export default function CustomersPage() {
       setError('Failed to load customers')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadCustomerEmails = async (customerId: string) => {
+    try {
+      setEmailsLoading(true)
+      const response = await fetch(`/api/customers/${customerId}/emails`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setCustomerEmails(data.emails)
+      } else {
+        console.error('Failed to load customer emails:', data.error)
+        setCustomerEmails([])
+      }
+    } catch (error) {
+      console.error('Error loading customer emails:', error)
+      setCustomerEmails([])
+    } finally {
+      setEmailsLoading(false)
     }
   }
 
@@ -582,7 +604,10 @@ export default function CustomersPage() {
                     <TableRow key={customer.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8 cursor-pointer" onClick={() => setSelectedCustomerDetail(customer)}>
+                          <Avatar className="h-8 w-8 cursor-pointer" onClick={() => {
+                            setSelectedCustomerDetail(customer)
+                            loadCustomerEmails(customer.id)
+                          }}>
                             <AvatarImage src={`/placeholder.svg?height=32&width=32`} />
                             <AvatarFallback className="bg-blue-100 text-blue-600">
                               {customer.name
@@ -591,7 +616,10 @@ export default function CustomersPage() {
                                 .join("")}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="cursor-pointer" onClick={() => setSelectedCustomerDetail(customer)}>
+                          <div className="cursor-pointer" onClick={() => {
+                            setSelectedCustomerDetail(customer)
+                            loadCustomerEmails(customer.id)
+                          }}>
                             <div className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
                               {customer.name}
                             </div>
@@ -849,6 +877,8 @@ export default function CustomersPage() {
         setSelectedCustomerDetail(null)
         setIsEditingComment(false)
         setDetailModalComment("")
+        setCustomerEmails([])
+        setEmailsLoading(false)
       }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -993,58 +1023,38 @@ export default function CustomersPage() {
               <div>
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-gray-600">Mail</Label>
-                  {!isEditingComment && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setIsEditingComment(true)
-                        setDetailModalComment('')
-                      }}
-                    >
-                      <MessageSquare className="h-3 w-3 mr-1" />
-                      Add Mail
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="opacity-50 cursor-not-allowed"
+                  >
+                    <MessageSquare className="h-3 w-3 mr-1" />
+                    Add Mail
+                  </Button>
                 </div>
                 
-                {isEditingComment ? (
-                  <div className="mt-2 space-y-3">
-                    <Textarea
-                      placeholder="Enter mail information..."
-                      value={detailModalComment || ""}
-                      onChange={(e) => setDetailModalComment(e.target.value)}
-                      rows={4}
-                      className="w-full"
-                    />
-                    <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          if (selectedCustomerDetail) {
-                            handleDetailModalCommentUpdate(selectedCustomerDetail.id, detailModalComment)
-                          }
-                        }}
-                      >
-                        Save Mail
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsEditingComment(false)
-                          setDetailModalComment("")
-                        }}
-                      >
-                        Cancel
-                      </Button>
+                <div className="mt-2">
+                  {emailsLoading ? (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-500">Loading email content...</p>
                     </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500 italic">No mail information added yet</p>
-                  </div>
-                )}
+                  ) : customerEmails.length > 0 ? (
+                    <div className="space-y-2">
+                      {customerEmails.map((email) => (
+                        <div key={email.id} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                            {email.content}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-500 italic">No mail information added yet</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Created Date */}
@@ -1068,6 +1078,8 @@ export default function CustomersPage() {
                   setSelectedCustomerDetail(null)
                   setIsEditingComment(false)
                   setDetailModalComment("")
+                  setCustomerEmails([])
+                  setEmailsLoading(false)
                 }
               }}
             >
@@ -1083,6 +1095,8 @@ export default function CustomersPage() {
                   setSelectedCustomerDetail(null)
                   setIsEditingComment(false)
                   setDetailModalComment("")
+                  setCustomerEmails([])
+                  setEmailsLoading(false)
                 }
               }}
             >

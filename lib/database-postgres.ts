@@ -474,6 +474,17 @@ class PostgreSQLDatabase {
     return result.rowCount > 0
   }
 
+  // Email operations
+  async getCustomerEmails(customerId: string): Promise<{ id: number; customer_id: number; content: string }[]> {
+    const result = await this.query(`
+      SELECT id, customer_id, content
+      FROM email
+      WHERE customer_id = $1
+      ORDER BY id DESC
+    `, [customerId])
+    return result.rows
+  }
+
   // User Preferences operations
   async getUserPreferences(userId: string): Promise<UserPreferences | null> {
     const result = await this.query(`
