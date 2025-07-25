@@ -83,7 +83,7 @@ export default function AnalysisControlPage() {
 
     try {
       // Send webhook POST request with parameters
-      const webhookResponse = await fetch('http://localhost:5678/webhook-test/c43c60c5-a3a6-498a-a607-9f3fb33f9ad1', {
+      const webhookResponse = await fetch('http://localhost:5678/webhook-test/9ee596cc-7809-4b08-b1f3-c8f1817f7f66', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -85,8 +85,8 @@ export default function CustomersPage() {
   const [recordsPerPage] = useState(10)
   
   // Sorting states
-  const [sortColumn, setSortColumn] = useState<keyof Customer | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [sortColumn, setSortColumn] = useState<keyof Customer | null>('createdDate')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [approveModalOpen, setApproveModalOpen] = useState(false)
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [selectedCustomerForAction, setSelectedCustomerForAction] = useState<Customer | null>(null)
