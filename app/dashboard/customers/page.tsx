@@ -66,7 +66,9 @@ interface Customer {
 export default function CustomersPage() {
   const { token } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [industries, setIndustries] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [industriesLoading, setIndustriesLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [industryFilter, setIndustryFilter] = useState("all")
@@ -94,9 +96,10 @@ export default function CustomersPage() {
   const [rejectComment, setRejectComment] = useState("")
   const [rejectCommentError, setRejectCommentError] = useState("")
 
-  // Load customers from API on component mount
+  // Load customers and industries from API on component mount
   useEffect(() => {
     loadCustomers()
+    loadIndustries()
   }, [])
 
   const loadCustomers = async () => {
@@ -139,6 +142,34 @@ export default function CustomersPage() {
       setError('Failed to load customers')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadIndustries = async () => {
+    try {
+      setIndustriesLoading(true)
+      
+      const response = await fetch('/api/industries')
+      const data = await response.json()
+      
+      console.log('Industries API response:', data) // Debug log
+      
+      if (data.success) {
+        // Extract unique industry names from the API response
+        // The API returns industries with 'name' property, not 'industry'
+        const industryNames = data.industries.map((industry: any) => industry.name).filter(Boolean)
+        console.log('Extracted industry names:', industryNames) // Debug log
+        // Remove duplicates and sort alphabetically
+        const uniqueIndustries = [...new Set(industryNames)].sort()
+        console.log('Unique industries:', uniqueIndustries) // Debug log
+        setIndustries(uniqueIndustries)
+      } else {
+        console.error('Failed to load industries:', data.message)
+      }
+    } catch (err) {
+      console.error('Error loading industries:', err)
+    } finally {
+      setIndustriesLoading(false)
     }
   }
 
@@ -463,10 +494,15 @@ export default function CustomersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Industries</SelectItem>
-                <SelectItem value="Technology">Technology</SelectItem>
-                <SelectItem value="Finance">Finance</SelectItem>
-                <SelectItem value="Healthcare">Healthcare</SelectItem>
-                <SelectItem value="Retail">Retail</SelectItem>
+                {industriesLoading ? (
+                  <SelectItem value="loading" disabled>Loading industries...</SelectItem>
+                ) : (
+                  industries.map((industry) => (
+                    <SelectItem key={industry} value={industry}>
+                      {industry}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
