@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -14,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Play, Building, Globe, Search, CheckCircle, ArrowRight } from "lucide-react"
+import { Play, Building, Globe, Search, CheckCircle, ArrowRight, Tag } from "lucide-react"
 import { toast } from "sonner"
 
 interface Country {
@@ -38,6 +39,7 @@ export default function AnalysisControlPage() {
   const [newAnalysis, setNewAnalysis] = useState({
     industry: "",
     countryCode: "",
+    keyword: "",
   })
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export default function AnalysisControlPage() {
     const selectedCountry = countries.find(c => c.code === newAnalysis.countryCode)
     const selectedIndustry = industries.find(i => i.industry === newAnalysis.industry)
     
-    const dorkKeywords = `${selectedCountry?.name} ${selectedIndustry?.industry}`
+    const dorkKeywords = `${selectedCountry?.name} ${selectedIndustry?.industry} ${newAnalysis.keyword}`.trim()
 
     try {
       // Send webhook POST request with parameters
@@ -92,7 +94,8 @@ export default function AnalysisControlPage() {
           keywords: dorkKeywords,
           country: selectedCountry?.name || '',
           countryCode: newAnalysis.countryCode,
-          industry: selectedIndustry?.industry || ''
+          industry: selectedIndustry?.industry || '',
+          keyword: newAnalysis.keyword
         })
       })
 
@@ -113,6 +116,7 @@ export default function AnalysisControlPage() {
     setNewAnalysis({
       industry: "",
       countryCode: "",
+      keyword: "",
     })
   }
  
@@ -227,6 +231,21 @@ export default function AnalysisControlPage() {
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="space-y-3">
+              <Label htmlFor="keyword" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Tag className="h-4 w-4 text-green-600" />
+                Keyword
+              </Label>
+              <Input
+                id="keyword"
+                type="text"
+                placeholder="Enter search keywords (optional)..."
+                value={newAnalysis.keyword}
+                onChange={(e) => setNewAnalysis({ ...newAnalysis, keyword: e.target.value })}
+                className="h-12"
+              />
+            </div>
 
             {newAnalysis.countryCode && newAnalysis.industry && (
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
@@ -234,7 +253,7 @@ export default function AnalysisControlPage() {
                   <Search className="h-4 w-4 text-blue-600" />
                   <span className="font-medium">Analysis Preview:</span>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="bg-blue-100 text-blue-700">
                     {newAnalysis.countryCode.toUpperCase()}
                   </Badge>
@@ -242,9 +261,17 @@ export default function AnalysisControlPage() {
                   <Badge variant="secondary" className="bg-purple-100 text-purple-700 capitalize">
                     {newAnalysis.industry}
                   </Badge>
+                  {newAnalysis.keyword && (
+                    <>
+                      <span className="text-gray-400">×</span>
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">
+                        {newAnalysis.keyword}
+                      </Badge>
+                    </>
+                  )}
                 </div>
                 <p className="text-xs text-gray-600 mt-2">
-                  Will search for "{newAnalysis.industry}" companies in {countries.find(c => c.code === newAnalysis.countryCode)?.name}
+                  Will search for "{newAnalysis.industry}" companies in {countries.find(c => c.code === newAnalysis.countryCode)?.name}{newAnalysis.keyword ? ` with keywords "${newAnalysis.keyword}"` : ''}
                 </p>
               </div>
             )}
